@@ -238,7 +238,8 @@ export function template(
       return;
     }
     lines.push("**Top priorities**");
-    state.tasks.slice(0, n).forEach((t, i) => lines.push(`${i + 1}. ${t.title}${t.dueDate ? ` (due ${t.dueDate}${t.dueDate < state.localDate ? ", overdue" : ""})` : ""}`));
+    const due = (d: string) => (d === state.localDate ? " (due today)" : d < state.localDate ? ` (due ${d}, overdue)` : ` (due ${d})`);
+    state.tasks.slice(0, n).forEach((t, i) => lines.push(`${i + 1}. ${t.title}${t.dueDate ? due(t.dueDate) : ""}`));
   };
 
   if (kind === "morning") {

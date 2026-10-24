@@ -17,6 +17,8 @@ export interface UiMessage {
   costUsd?: number | null;
   latencyMs?: number | null;
   firstTokenMs?: number;
+  suggestions?: { id: string; kind: string; title: string; decided?: "accepted" | "dismissed" }[];
+  context?: { id: string; category: string; content: string; reason: string }[];
 }
 
 interface ConversationSummary {
@@ -26,8 +28,18 @@ interface ConversationSummary {
 }
 
 type StreamEvent =
-  | { type: "meta"; conversationId: string; model: string; tier: string; routeReason: string; mode: string; warnings: string[] }
+  | {
+      type: "meta";
+      conversationId: string;
+      model: string;
+      tier: string;
+      routeReason: string;
+      mode: string;
+      warnings: string[];
+      context: { id: string; category: string; content: string; reason: string }[];
+    }
   | { type: "delta"; text: string }
+  | { type: "suggestion"; id: string; kind: string; title: string }
   | { type: "done"; assistantMessageId: string; costUsd: number; latencyMs: number; spend: { monthUsd: number; monthHardUsd: number } }
   | { type: "error"; code: string; message: string; spend?: { monthUsd: number; monthHardUsd: number } };
 
@@ -133,7 +145,9 @@ export function ChatView(props: {
                 window.history.replaceState(null, "", `/chat/${ev.conversationId}`);
               }
               setWarnings(ev.warnings);
-              patchAssistant(asstId, { model: ev.model, routeReason: ev.routeReason });
+              patchAssistant(asstId, { model: ev.model, routeReason: ev.routeReason, context: ev.context });
+            } else if (ev.type === "suggestion") {
+              patchAssistant(asstId, (m) => ({ suggestions: [...(m.suggestions ?? []), { id: ev.id, kind: ev.kind, title: ev.title }] }));
             } else if (ev.type === "delta") {
               if (!gotFirst) {
                 gotFirst = true;
@@ -272,6 +286,14 @@ export function ChatView(props: {
                       {m.status === "partial" && <span className="badge badge-warn">incomplete</span>}
                     </div>
                   )}
+                  {m.suggestions && m.suggestions.length > 0 && (
+                    <div className="chip-row" aria-label="Suggestions from this reply">
+                      {m.suggestions.map((sg) => (
+                        <SuggestionChip key={sg.id} s={sg} onDecided={(d) => patchAssistant(m.id, (x) => ({ suggestions: x.suggestions?.map((y) => (y.id === sg.id ? { ...y, decided: d } : y)) }))} />
+                      ))}
+                    </div>
+                  )}
+                  {m.status !== "streaming" && m.role === "assistant" && <ContextUsed message={m} />}
                 </article>
               ),
             )}
@@ -328,5 +350,65 @@ export function ChatView(props: {
         </div>
       </section>
     </div>
+  );
+}
+
+const CHIP_LABEL: Record<string, string> = { memory: "Remember", task: "Task", goal: "Goal", action: "Suggestion" };
+
+function SuggestionChip({ s, onDecided }: { s: NonNullable<UiMessage["suggestions"]>[number]; onDecided: (d: "accepted" | "dismissed") => void }) {
+  const [busy, setBusy] = useState(false);
+  const decide = async (action: "accept" | "dismiss") => {
+    setBusy(true);
+    try {
+      await api(`/api/suggestions/${s.id}`, { body: { action } });
+      onDecided(action === "accept" ? "accepted" : "dismissed");
+    } catch {
+      setBusy(false);
+    }
+  };
+  return (
+    <span className={`sugg-chip${s.decided ? " decided" : ""}`}>
+      <strong>{CHIP_LABEL[s.kind] ?? s.kind}:</strong>
+      <span className="what">{s.title}</span>
+      {s.decided ? (
+        <span className="faint">{s.decided === "accepted" ? "✓ saved" : "dismissed"}</span>
+      ) : (
+        <>
+          <button className="btn btn-sm btn-primary" style={{ minHeight: 28 }} disabled={busy} onClick={() => decide("accept")}>Accept</button>
+          <button className="btn btn-sm btn-ghost" style={{ minHeight: 28 }} disabled={busy} onClick={() => decide("dismiss")} aria-label={`Dismiss: ${s.title}`}>✕</button>
+        </>
+      )}
+    </span>
+  );
+}
+
+/** "Why did Maverick know that?": the memories given to the model for this reply. */
+function ContextUsed({ message }: { message: UiMessage }) {
+  const [items, setItems] = useState(message.context);
+  const load = async () => {
+    if (items !== undefined || message.id.startsWith("a-")) return;
+    try {
+      setItems((await api<{ context: NonNullable<UiMessage["context"]> }>(`/api/messages/${message.id}/context`)).context);
+    } catch {
+      setItems([]);
+    }
+  };
+  if (items !== undefined && items.length === 0) return null;
+  return (
+    <details className="ctx-details" onToggle={(e) => (e.currentTarget.open ? void load() : undefined)}>
+      <summary>Context used{items ? ` (${items.length} memor${items.length === 1 ? "y" : "ies"})` : ""}</summary>
+      {items === undefined ? (
+        <p>Loading…</p>
+      ) : (
+        <ul>
+          {items.map((c) => (
+            <li key={c.id}>
+              {c.content} <span className="faint">({c.reason})</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <a href="/memory">Manage memories</a>
+    </details>
   );
 }

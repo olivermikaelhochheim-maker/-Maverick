@@ -26,7 +26,7 @@ export class MockProvider implements LLMProvider {
         const result = await tool.run(call.input);
         yield { type: "tool", name: call.name, ok: result.ok };
         const text = result.ok
-          ? `I've put that in your inbox as a suggestion. Accept it there and it's saved.${MOCK_NOTE}`
+          ? `I've suggested that. Accept it below (or later in your inbox) and it's saved; until then it isn't.${MOCK_NOTE}`
           : `I couldn't file that: ${result.content}${MOCK_NOTE}`;
         for (const w of text.split(/(\s+)/)) yield { type: "text", text: w };
         yield { type: "done", stopReason: "end_turn", servedBy: req.model, usage: { inputTokens: estimateTokens(last) + 500, outputTokens: 40 } };

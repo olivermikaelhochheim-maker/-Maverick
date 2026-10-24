@@ -28,6 +28,12 @@ export default defineConfig({
       MAVERICK_SETUP_CODE: "E2E-CODE",
       MAVERICK_DATA_KEY: Buffer.alloc(32, 7).toString("base64"),
       MAVERICK_LOG_LEVEL: "warn",
+      MAVERICK_SCHEDULER: "off",
+      MAVERICK_CALENDAR_PROVIDER: "mock",
+      MAVERICK_VAPID_PUBLIC_KEY: "",
+      MAVERICK_VAPID_PRIVATE_KEY: "",
+      GOOGLE_CLIENT_ID: "",
+      GOOGLE_CLIENT_SECRET: "",
     },
   },
 });

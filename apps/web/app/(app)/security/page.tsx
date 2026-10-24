@@ -2,7 +2,37 @@ import { listAudit, listSessions } from "@maverick/core";
 import { SessionsPanel } from "@/components/SessionsPanel";
 import { getMaverick, getSessionToken, requireUser } from "@/lib/server";
 
+const SCOPE_LABELS: Record<string, string> = {
+  "https://www.googleapis.com/auth/calendar.readonly": "Read your calendars (read-only)",
+  openid: "Confirm your Google identity",
+  email: "See your email address (to show which account is connected)",
+  "https://www.googleapis.com/auth/userinfo.email": "See your email address (to show which account is connected)",
+};
+
 const ACTION_LABELS: Record<string, string> = {
+  "memory.created": "Memory saved",
+  "memory.updated": "Memory edited",
+  "memory.deleted": "Memory deleted",
+  "memory.expired": "Expired memories removed",
+  "goal.created": "Goal added",
+  "goal.updated": "Goal updated",
+  "goal.deleted": "Goal deleted",
+  "task.created": "Task added",
+  "task.updated": "Task updated",
+  "task.completed": "Task completed",
+  "task.deleted": "Task deleted",
+  "suggestion.proposed": "Maverick made a suggestion",
+  "suggestion.accepted": "Suggestion accepted",
+  "suggestion.dismissed": "Suggestion dismissed",
+  "briefing.morning": "Morning briefing",
+  "briefing.evening": "Evening check-in",
+  "briefing.weekly": "Weekly review",
+  "integration.connected": "Account connected",
+  "integration.disconnected": "Account disconnected",
+  "integration.needs_reauth": "Account needs reconnecting",
+  "notifications.device_added": "Notifications enabled on a device",
+  "notifications.device_removed": "Notifications turned off on a device",
+  "data.exported": "Data exported",
   "account.created": "Account created",
   "login.succeeded": "Signed in",
   "login.failed": "Failed sign-in attempt",
@@ -22,6 +52,8 @@ export default async function SecurityPage() {
   const m = await getMaverick();
   const sessions = await listSessions(m.db, user.id, await getSessionToken());
   const audit = await listAudit(m.db, user.id, 200);
+  const integrations = await m.integrations.list(user.id);
+  const devices = await m.notifier.deviceCount(user.id);
 
   return (
     <div className="page">
@@ -38,10 +70,28 @@ export default async function SecurityPage() {
         </section>
         <section className="card span-6">
           <h3>Connected accounts &amp; permissions</h3>
-          <p className="empty">None. Maverick has no access to any outside account.</p>
-          <p className="phase-note">
-            Calendar, email and tasks arrive in Phase 4 via official sign-in (OAuth), with the exact permissions listed here and a revoke button for each.
-            All external actions will require your confirmation.
+          {integrations.length === 0 ? (
+            <p className="empty">None. Maverick has no access to any outside account.</p>
+          ) : (
+            <ul className="list-plain">
+              {integrations.map((i) => (
+                <li key={i.id}>
+                  <div className="item">
+                    Google {i.accountEmail && <span className="muted">({i.accountEmail})</span>}{" "}
+                    {i.status === "needs_reauth" ? <span className="badge badge-warn">needs reconnecting</span> : <span className="badge badge-accent">active</span>}
+                    <ul className="small muted" style={{ margin: "0.3rem 0 0", paddingLeft: "1.1rem" }}>
+                      {i.scopes.map((s) => (
+                        <li key={s}>{SCOPE_LABELS[s] ?? s}</li>
+                      ))}
+                    </ul>
+                    <p className="hint">Connected {new Date(i.createdAt).toLocaleDateString("en-GB")} · <a href="/settings#calendar">Manage or revoke</a></p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="small muted" style={{ marginTop: "0.6rem" }}>
+            Push notifications: {devices} device{devices === 1 ? "" : "s"} registered. Maverick can read; it cannot send, book, buy, post or change anything outside itself.
           </p>
         </section>
         <section className="card span-12">

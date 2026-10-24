@@ -130,10 +130,121 @@ test.describe.serial("Maverick", () => {
 
   test("every page fits the screen without sideways scrolling", async ({ page }) => {
     await ensureAccount(page);
-    for (const p of ["/", "/chat", "/usage", "/security", "/settings"]) {
+    for (const p of ["/", "/chat", "/planning", "/memory", "/usage", "/security", "/settings"]) {
       await page.goto(p);
       await noHorizontalScroll(page);
     }
+  });
+
+  test("Maverick's 'remember' suggestion needs approval, then shows up in the Memory Vault and in context", async ({ page }) => {
+    await ensureAccount(page);
+    await page.goto("/chat");
+    // Unique per project run: an identical pending suggestion is deliberately de-duplicated.
+    const fact = `I do my best work before 11:00 (${test.info().project.name})`;
+    await page.getByLabel("Message Maverick").fill(`Remember that ${fact}`);
+    await page.getByLabel("Message Maverick").press("Enter");
+    const chip = page.locator(".sugg-chip").last();
+    await expect(chip).toContainText(fact, { timeout: 20_000 });
+    // Not saved until accepted.
+    const chatUrl = page.url();
+    await page.goto("/memory");
+    await expect(page.getByText(fact)).toHaveCount(0);
+    // The chip survives a reload of the conversation.
+    await page.goto(chatUrl);
+    await page.locator(".sugg-chip").last().getByRole("button", { name: "Accept" }).click();
+    await expect(page.locator(".sugg-chip").last()).toContainText("saved");
+    await page.reload();
+    await expect(page.locator(".sugg-chip").last()).toContainText("saved");
+    await page.goto("/memory");
+    await expect(page.getByText(fact)).toBeVisible();
+    await expect(page.getByText(/Suggested from a conversation, approved by you/).first()).toBeVisible();
+    // Next reply shows it in "Context used" with a reason.
+    await page.goto("/chat");
+    await page.getByLabel("Message Maverick").fill("hello again");
+    await page.getByLabel("Message Maverick").press("Enter");
+    await expect(page.locator(".msg-assistant").last()).toContainText("Good to see you", { timeout: 20_000 });
+    await page.locator(".ctx-details").last().locator("summary").click();
+    await expect(page.locator(".ctx-details").last()).toContainText("Always included: preferences");
+  });
+
+  test("Memory Vault: add, edit, delete", async ({ page }) => {
+    await ensureAccount(page);
+    await page.goto("/memory");
+    await page.getByLabel("Memory", { exact: true }).fill("Trains at 17:30 on weekdays");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    const item = page.locator(".mem-item", { hasText: "Trains at 17:30" });
+    await expect(item).toContainText("Added by you");
+    await item.getByRole("button", { name: "Edit" }).click();
+    await page.getByLabel("Edit memory").fill("Trains at 18:00 on weekdays");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.getByText("Trains at 18:00 on weekdays")).toBeVisible();
+    page.once("dialog", (d) => d.accept());
+    await page.locator(".mem-item", { hasText: "Trains at 18:00" }).getByRole("button", { name: "Delete" }).click();
+    await expect(page.getByText("Trains at 18:00 on weekdays")).toHaveCount(0);
+  });
+
+  test("goals and tasks: add, link, complete", async ({ page }) => {
+    await ensureAccount(page);
+    const tag = test.info().project.name;
+    const goalName = `Private pilot licence (${tag})`;
+    const taskName = `Book the class 2 medical (${tag})`;
+    await page.goto("/planning");
+    await page.getByLabel("Outcome").fill(goalName);
+    await page.getByLabel("How you'll measure it").fill("Checkride passed");
+    await page.getByRole("button", { name: "Add goal" }).click();
+    await expect(page.locator(".goal-item", { hasText: goalName })).toBeVisible();
+    await page.getByLabel("New task").fill(taskName);
+    await page.getByLabel("Priority").selectOption("1");
+    await page.getByLabel("Goal", { exact: true }).selectOption({ label: goalName });
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    const row = page.locator(".task-row", { hasText: taskName });
+    await expect(row).toContainText(`→ ${goalName}`);
+    await page.goto("/");
+    const quick = page.locator(".task-row", { hasText: taskName });
+    await quick.getByRole("checkbox").check();
+    await page.reload();
+    await expect(page.locator(".task-row", { hasText: taskName })).toHaveCount(0);
+  });
+
+  test("Brief me now: a briefing built from the calendar and tasks", async ({ page }) => {
+    await ensureAccount(page);
+    await page.goto("/");
+    await expect(page.getByText("Deep work: client proposal")).toBeVisible(); // agenda card (demo calendar)
+    await page.getByRole("button", { name: "Brief me now" }).click();
+    await page.waitForURL(/\/chat\/[0-9a-f-]{36}/);
+    const brief = page.locator(".msg-assistant").first();
+    await expect(brief).toContainText("Good morning, Oliver");
+    await expect(brief).toContainText("Deep work: client proposal");
+    await expect(brief).toContainText("Which single outcome matters most today?");
+    // Replying continues the conversation.
+    await page.getByLabel("Message Maverick").fill("The proposal matters most");
+    await page.getByLabel("Message Maverick").press("Enter");
+    await expect(page.locator(".msg-assistant")).toHaveCount(2, { timeout: 20_000 });
+  });
+
+  test("settings: daily rhythm, proactivity and notification panel", async ({ page }) => {
+    await ensureAccount(page);
+    await page.goto("/settings");
+    await expect(page.getByLabel("Morning briefing time")).toHaveValue("05:30");
+    await expect(page.getByLabel("Quiet hours start")).toHaveValue("22:00");
+    await page.getByLabel("Evening check-in time").fill("20:30");
+    await page.getByRole("button", { name: "Save settings" }).click();
+    await expect(page.locator("form [role=status]")).toContainText("Saved");
+    await page.reload();
+    await expect(page.getByLabel("Evening check-in time")).toHaveValue("20:30");
+    // Server has no push keys in this test run: the panel says so instead of pretending.
+    await expect(page.getByText("Notifications aren't set up on the server yet")).toBeVisible();
+    await expect(page.getByText("Demo calendar in use")).toBeVisible();
+  });
+
+  test("data export includes memories and conversations", async ({ page }) => {
+    await ensureAccount(page);
+    const res = await page.request.get("/api/export");
+    expect(res.status()).toBe(200);
+    const data = await res.json();
+    expect(data.format).toBe("maverick-export-v1");
+    expect(data.conversations.length).toBeGreaterThan(0);
+    expect(JSON.stringify(data)).not.toContain("v1:");
   });
 
   test("security headers are present", async ({ request }) => {

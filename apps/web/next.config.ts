@@ -16,6 +16,8 @@ const csp = [
   "img-src 'self' data: blob:",
   "font-src 'self'",
   "connect-src 'self'",
+  "worker-src 'self'",
+  "manifest-src 'self'",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -24,7 +26,7 @@ const csp = [
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@maverick/core"],
-  serverExternalPackages: ["@electric-sql/pglite", "pg"],
+  serverExternalPackages: ["@electric-sql/pglite", "pg", "web-push"],
   poweredByHeader: false,
   async headers() {
     return [

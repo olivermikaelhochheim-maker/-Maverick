@@ -128,7 +128,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); outline
 .card { min-width: 0; background: linear-gradient(180deg, #121c2f 0%, #0f1727 100%); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.2rem; }
 .card + .card { margin-top: 1rem; }
 .cards { display: grid; grid-template-columns: repeat(12, 1fr); gap: 1rem; }
-.span-4 { grid-column: span 4; } .span-6 { grid-column: span 6; } .span-8 { grid-column: span 8; } .span-12 { grid-column: span 12; }
+.span-4 { grid-column: span 4; } .span-5 { grid-column: span 5; } .span-7 { grid-column: span 7; } .span-6 { grid-column: span 6; } .span-8 { grid-column: span 8; } .span-12 { grid-column: span 12; }
 .muted { color: var(--muted); }
 .faint { color: var(--faint); }
 .small { font-size: 0.85rem; }
@@ -224,7 +224,7 @@ td { padding: 0.55rem 0.5rem; border-bottom: 1px solid var(--border); vertical-a
   .main { padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom)); }
   .page { padding: 1.2rem 1rem 2rem; }
   .cards { grid-template-columns: 1fr; }
-  .span-4, .span-6, .span-8, .span-12 { grid-column: span 1; }
+  .span-4, .span-5, .span-6, .span-7, .span-8, .span-12 { grid-column: span 1; }
   .grid-2 { grid-template-columns: 1fr; }
   .hero { gap: 0.75rem; flex-direction: column; align-items: stretch; }
   .hero > .orb { width: 48px; height: 48px; }
@@ -252,3 +252,40 @@ td { padding: 0.55rem 0.5rem; border-bottom: 1px solid var(--border); vertical-a
 [data-reduce-motion="true"] *, [data-reduce-motion="true"] *::before, [data-reduce-motion="true"] *::after {
   animation: none !important; transition: none !important;
 }
+
+/* ---------- Milestone 2: inbox, tasks, memory ---------- */
+.badge-danger { border-color: #5a2a33; color: var(--danger); }
+.inbox-item { padding: 0.75rem 0; }
+.inbox-title { margin: 0.35rem 0 0.15rem; overflow-wrap: anywhere; }
+.task-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 0; color: var(--text); cursor: pointer; font-size: 0.95rem; margin: 0; }
+.task-row input { width: 20px; height: 20px; min-height: 0; accent-color: var(--accent); flex-shrink: 0; }
+.task-row .task-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.task-row.done .task-title { text-decoration: line-through; color: var(--faint); }
+.prio { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.prio-1 { background: var(--danger); } .prio-2 { background: var(--warn); } .prio-3 { background: var(--faint); }
+.agenda { list-style: none; margin: 0; padding: 0; }
+.agenda li { display: flex; gap: 0.8rem; padding: 0.45rem 0; border-bottom: 1px solid var(--border); }
+.agenda li:last-child { border-bottom: none; }
+.agenda .time { color: var(--accent); font-variant-numeric: tabular-nums; min-width: 6.5rem; font-size: 0.9rem; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.5rem; }
+.sugg-chip { display: inline-flex; align-items: center; gap: 0.45rem; border: 1px dashed #1f5b66; background: var(--accent-soft); color: var(--text); border-radius: 10px; padding: 0.35rem 0.6rem; font-size: 0.85rem; max-width: 100%; }
+.sugg-chip .what { overflow: hidden; text-overflow: ellipsis; }
+.sugg-chip.decided { border-style: solid; opacity: 0.7; }
+.ctx-details { font-size: 0.78rem; color: var(--faint); margin-top: 0.3rem; }
+.ctx-details summary { cursor: pointer; }
+.ctx-details li { margin: 0.2rem 0; }
+.toolbar { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
+.toolbar input, .toolbar select { width: auto; flex: 1; min-width: 140px; }
+.mem-item { padding: 0.8rem 0; }
+.mem-meta { font-size: 0.78rem; color: var(--faint); margin-top: 0.25rem; display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; }
+.mem-meta select { width: auto; min-height: 30px; padding: 0.15rem 0.4rem; font-size: 0.78rem; }
+.goal-item { padding: 0.75rem 0; }
+.goal-item .metric { font-size: 0.85rem; color: var(--muted); }
+.inline-form { display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; }
+.inline-form .wide { grid-column: 1 / -1; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.6rem; }
+.settings-links { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.time-pair { flex-wrap: nowrap; gap: 0.4rem; }
+.time-pair > input, .time-pair > select { flex: 1 1 0; min-width: 0; width: auto; }
+.form-grid > * { min-width: 0; }
+.inbox-item .hint a { display: inline; padding: 0; }

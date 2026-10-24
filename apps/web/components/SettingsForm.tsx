@@ -51,7 +51,7 @@ export function SettingsForm({ initial }: { initial: Settings }) {
                 <option key={tz} value={tz}>{tz}{tz === browserTz ? " (this device)" : ""}</option>
               ))}
             </select>
-            <p className="hint">Used for greetings and dates now; for briefings and quiet hours in Phase 3.</p>
+            <p className="hint">Used for greetings, briefings, reminders and quiet hours.</p>
           </div>
           <label className="check field">
             <input type="checkbox" checked={s.ui.reduceMotion} onChange={(e) => set("ui", { ...s.ui, reduceMotion: e.target.checked })} />
@@ -82,16 +82,46 @@ export function SettingsForm({ initial }: { initial: Settings }) {
         </section>
 
         <section className="card span-12" aria-labelledby="h-schedule">
-          <h2 id="h-schedule">Daily rhythm</h2>
-          <p className="muted small">Saved now and used once briefings and reminders arrive in Phase 3. Until then Maverick never contacts you on its own.</p>
-          <div className="grid-2">
+          <h2 id="h-schedule">Daily rhythm &amp; proactivity</h2>
+          <p className="muted small">
+            When Maverick reaches out on its own. Briefings appear as conversations; notifications go only to devices you&apos;ve enabled below, never during quiet hours.
+          </p>
+          <div className="form-grid">
             <div className="field">
-              <label htmlFor="brief">Morning briefing</label>
+              <label className="check" style={{ marginBottom: "0.4rem" }}>
+                <input type="checkbox" checked={s.proactive.morningBriefing} onChange={(e) => set("proactive", { ...s.proactive, morningBriefing: e.target.checked })} />
+                Morning briefing
+              </label>
+              <label htmlFor="brief" className="sr-only">Morning briefing time</label>
               <input id="brief" type="time" value={s.schedule.briefingTime} onChange={(e) => set("schedule", { ...s.schedule, briefingTime: e.target.value })} />
             </div>
             <div className="field">
+              <label className="check" style={{ marginBottom: "0.4rem" }}>
+                <input type="checkbox" checked={s.proactive.eveningCheckIn} onChange={(e) => set("proactive", { ...s.proactive, eveningCheckIn: e.target.checked })} />
+                Evening check-in
+              </label>
+              <label htmlFor="checkin" className="sr-only">Evening check-in time</label>
+              <input id="checkin" type="time" value={s.schedule.checkInTime} onChange={(e) => set("schedule", { ...s.schedule, checkInTime: e.target.value })} />
+            </div>
+            <div className="field">
+              <label className="check" style={{ marginBottom: "0.4rem" }}>
+                <input type="checkbox" checked={s.proactive.weeklyReview} onChange={(e) => set("proactive", { ...s.proactive, weeklyReview: e.target.checked })} />
+                Weekly review
+              </label>
+              <div className="row time-pair">
+                <label htmlFor="wday" className="sr-only">Weekly review day</label>
+                <select id="wday" value={s.schedule.weeklyReview.day} onChange={(e) => set("schedule", { ...s.schedule, weeklyReview: { ...s.schedule.weeklyReview, day: Number(e.target.value) } })}>
+                  {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((d, i) => (
+                    <option key={d} value={i}>{d}</option>
+                  ))}
+                </select>
+                <label htmlFor="wtime" className="sr-only">Weekly review time</label>
+                <input id="wtime" type="time" value={s.schedule.weeklyReview.time} onChange={(e) => set("schedule", { ...s.schedule, weeklyReview: { ...s.schedule.weeklyReview, time: e.target.value } })} />
+              </div>
+            </div>
+            <div className="field">
               <label>Quiet hours (no notifications)</label>
-              <div className="row" style={{ flexWrap: "nowrap" }}>
+              <div className="row time-pair">
                 <label htmlFor="qstart" className="sr-only">Quiet hours start</label>
                 <input id="qstart" type="time" value={s.schedule.quietHours.start} onChange={(e) => set("schedule", { ...s.schedule, quietHours: { ...s.schedule.quietHours, start: e.target.value } })} />
                 <span className="muted">to</span>
@@ -100,13 +130,27 @@ export function SettingsForm({ initial }: { initial: Settings }) {
               </div>
             </div>
           </div>
+          <label className="check field">
+            <input type="checkbox" checked={s.proactive.suggestFromChat} onChange={(e) => set("proactive", { ...s.proactive, suggestFromChat: e.target.checked })} />
+            Let Maverick suggest memories, tasks, goals and actions (they wait in your inbox for approval)
+          </label>
+          <div className="grid-2">
+            <label className="check field">
+              <input type="checkbox" checked={s.notifications.enabled} onChange={(e) => set("notifications", { ...s.notifications, enabled: e.target.checked })} />
+              Allow push notifications
+            </label>
+            <div className="field">
+              <label htmlFor="maxn">Max notifications per day</label>
+              <input id="maxn" type="number" min={0} max={50} step={1} value={s.notifications.maxPerDay} onChange={(e) => set("notifications", { ...s.notifications, maxPerDay: num(e.target.value) })} />
+            </div>
+          </div>
         </section>
 
         <section className="card span-12" aria-labelledby="h-about">
           <h2 id="h-about">About me</h2>
           <p className="muted small">
             Maverick reads this with every message. Keep it to facts you&apos;ve chosen to share. It&apos;s stored encrypted, and sent to the
-            model provider (Anthropic) with each message so Maverick has the context. Structured memory with provenance arrives in Phase 3.
+            model provider (Anthropic) with each message so Maverick has the context. For individual facts with sources and expiry, use the Memory Vault.
           </p>
           <label htmlFor="about" className="sr-only">About me</label>
           <textarea id="about" rows={10} value={s.aboutMe} onChange={(e) => set("aboutMe", e.target.value)} maxLength={8000} />

@@ -7,17 +7,18 @@ import { Icon } from "./Icons";
 import { Orb } from "./Orb";
 
 const NAV = [
-  { href: "/", label: "Command Center", short: "Home", icon: Icon.home },
-  { href: "/chat", label: "Conversation", short: "Chat", icon: Icon.chat },
-  { href: "/usage", label: "Usage & Budget", short: "Usage", icon: Icon.chart },
-  { href: "/security", label: "Security", short: "Security", icon: Icon.shield },
-  { href: "/settings", label: "Settings", short: "Settings", icon: Icon.gear },
+  { href: "/", label: "Command Center", short: "Home", icon: Icon.home, mobile: true },
+  { href: "/chat", label: "Conversation", short: "Chat", icon: Icon.chat, mobile: true },
+  { href: "/planning", label: "Goals & Tasks", short: "Plan", icon: Icon.check, mobile: true },
+  { href: "/memory", label: "Memory Vault", short: "Memory", icon: Icon.brain, mobile: true },
+  { href: "/usage", label: "Usage & Budget", short: "Usage", icon: Icon.chart, mobile: false },
+  { href: "/security", label: "Security", short: "Security", icon: Icon.shield, mobile: false },
+  { href: "/settings", label: "Settings", short: "More", icon: Icon.gear, mobile: true },
 ];
 
 // Shown so the roadmap is visible, but clearly not available yet.
 const LOCKED = [
-  { label: "Memory Vault", phase: 3 },
-  { label: "Projects & Tasks", phase: 3 },
+  { label: "Voice", phase: 2 },
   { label: "Zorza CEO", phase: 5 },
 ];
 
@@ -49,7 +50,7 @@ export function Shell({ children, mode }: { children: ReactNode; mode: "live" | 
           {LOCKED.map((n) => (
             <li key={n.label}>
               <span className="nav-link nav-locked" title={`Arrives in Phase ${n.phase}`}>
-                <Icon.lock /> {n.label} <span className="badge" style={{ marginLeft: "auto" }}>P{n.phase}</span>
+                <Icon.lock /> {n.label} <span className="badge" style={{ marginLeft: "auto" }}>Phase {n.phase}</span>
               </span>
             </li>
           ))}
@@ -60,8 +61,12 @@ export function Shell({ children, mode }: { children: ReactNode; mode: "live" | 
       </nav>
       <main id="main" className="main">{children}</main>
       <nav className="tabbar" aria-label="Main">
-        {NAV.map((n) => (
-          <Link key={n.href} href={n.href} aria-current={isActive(pathname, n.href) ? "page" : undefined}>
+        {NAV.filter((n) => n.mobile).map((n) => (
+          <Link
+            key={n.href}
+            href={n.href}
+            aria-current={isActive(pathname, n.href) || (n.href === "/settings" && ["/usage", "/security"].some((p) => isActive(pathname, p))) ? "page" : undefined}
+          >
             <n.icon /> {n.short}
           </Link>
         ))}

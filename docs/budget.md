@@ -17,6 +17,18 @@ Assumptions per message: ~5,000 input tokens (system prompt + notes + recent his
 Per-message estimates: Haiku ≈ $0.001, Sonnet ≈ $0.015 (with prompt caching), Opus ≈ $0.05.
 The default hard cap ($40) stops the heavy case from passing $40 in model costs.
 
+## Chief-of-staff milestone additions
+
+| Item | Estimate |
+|---|---|
+| Morning briefing, Sonnet 5.5, ~3k in / ~600 out incl. a possible tool round | ~$0.02 × 30 = $0.60 |
+| Evening check-in | ~$0.015 × 30 = $0.45 |
+| Weekly review | ~$0.03 × 4 = $0.12 |
+| Extra context per chat message (memories + goals/tasks/calendar, ~+800 tokens) | +$0.0001 (Haiku) to +$0.0016 (Sonnet) per message: about +$0.60/month typical |
+| Proposal tool round trips (when Maverick suggests something) | +1 model call on those turns, roughly +10–15% of chat cost |
+
+Typical total moves from ~$7.50 to **~$10/month**. Briefings fall back to a free template once the soft limit ($30) is reached. Web Push and Google Calendar API: $0.
+
 ## Later phases (planning ranges, *unverified*)
 
 | Item | Phase | Rough monthly |

@@ -7,7 +7,7 @@
  *   pnpm configure --yes    accept defaults (mock mode, no prompts)
  */
 import { execFileSync } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createECDH, randomBytes } from "node:crypto";
 import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createInterface } from "node:readline/promises";
@@ -119,6 +119,48 @@ if (has("ANTHROPIC_API_KEY")) {
     ok("Mock mode for now. Re-run `pnpm configure` any time to add a key.");
   }
 }
+
+// 5. Web Push keys (for notifications on iPhone/Mac). Generated once; never change them,
+//    or every device has to re-enable notifications.
+if (env.get("MAVERICK_VAPID_PUBLIC_KEY") && has("MAVERICK_VAPID_PRIVATE_KEY")) {
+  ok("Notification keys already exist (kept as is)");
+} else {
+  const ecdh = createECDH("prime256v1");
+  ecdh.generateKeys();
+  env.set("MAVERICK_VAPID_PUBLIC_KEY", ecdh.getPublicKey().toString("base64url"));
+  const priv = ecdh.getPrivateKey().toString("base64url");
+  if (isMac && !auto) {
+    keychainSet("MAVERICK_VAPID_PRIVATE_KEY", priv);
+    env.set("MAVERICK_VAPID_PRIVATE_KEY", "");
+    ok("Notification keys created (private key in the Keychain)");
+  } else {
+    env.set("MAVERICK_VAPID_PRIVATE_KEY", priv);
+    ok("Notification keys created");
+  }
+}
+if (!env.get("MAVERICK_VAPID_SUBJECT")) {
+  const email = await ask("Email for push services to contact if something's wrong (optional)", "");
+  env.set("MAVERICK_VAPID_SUBJECT", email ? `mailto:${email}` : "mailto:maverick@localhost");
+}
+
+// 6. Google Calendar (optional, read-only)
+if (has("GOOGLE_CLIENT_ID") && has("GOOGLE_CLIENT_SECRET")) {
+  ok("Google Calendar credentials found");
+} else if (!auto && (await yesNo("Set up Google Calendar now? (needs the Client ID and Secret from README → Connect Google Calendar)", false))) {
+  const id = await ask("Google Client ID (ends with .apps.googleusercontent.com)", "");
+  const secret = await ask("Google Client Secret", "");
+  if (id && secret) {
+    env.set("GOOGLE_CLIENT_ID", id);
+    if (isMac && (await yesNo("Store the client secret in the macOS Keychain (recommended)?", true))) {
+      keychainSet("GOOGLE_CLIENT_SECRET", secret);
+      env.set("GOOGLE_CLIENT_SECRET", "");
+    } else env.set("GOOGLE_CLIENT_SECRET", secret);
+    ok("Google Calendar credentials saved. Restart Maverick, then Settings → Connect Google Calendar.");
+  }
+} else {
+  ok("Google Calendar: skipped for now (re-run `pnpm configure` later)");
+}
+if (!env.get("MAVERICK_PUBLIC_URL")) env.set("MAVERICK_PUBLIC_URL", "http://localhost:3000");
 
 // Write .env, preserving the example's comments and order.
 const template = readFileSync(path.join(root, ".env.example"), "utf8");

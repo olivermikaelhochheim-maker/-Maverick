@@ -1,29 +1,17 @@
 import "server-only";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { getMaverick } from "./maverick";
 import {
   SESSION_COOKIE,
   UserFacingError,
-  createMaverick,
   log,
   validateSession,
   type Maverick,
   type User,
 } from "@maverick/core";
 
-/**
- * One Maverick instance per server process. Stored on globalThis so dev-mode
- * hot reloads don't open a second handle on the embedded database.
- */
-const g = globalThis as unknown as { __maverick?: Promise<Maverick> };
-
-export function getMaverick(): Promise<Maverick> {
-  g.__maverick ??= createMaverick().catch((err) => {
-    g.__maverick = undefined;
-    throw err;
-  });
-  return g.__maverick;
-}
+export { getMaverick };
 
 export async function getSessionToken(): Promise<string | undefined> {
   return (await cookies()).get(SESSION_COOKIE)?.value;
@@ -77,7 +65,14 @@ export function assertSameOrigin(req: Request): void {
   } catch {
     throw new UserFacingError("Bad origin.", "bad_origin", 403);
   }
-  if (originHost !== host) throw new UserFacingError("Cross-site request blocked.", "bad_origin", 403);
+  // Extra origins Oliver explicitly trusts, e.g. his Tailscale https address behind `tailscale serve`.
+  const allowed = (process.env.MAVERICK_ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((o) => o.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+  if (originHost !== host && !allowed.includes(origin.replace(/\/$/, ""))) {
+    throw new UserFacingError("Cross-site request blocked.", "bad_origin", 403);
+  }
 }
 
 /** Authenticated API entry point: origin check (for writes) + session. */

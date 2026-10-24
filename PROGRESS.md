@@ -1,93 +1,74 @@
 # Maverick: progress log
 
-## Status: Phase 0 + Phase 1 built and tested (mock mode). Oliver's answers applied. Awaiting approval of the next milestone.
+## Status: Milestone 2 (Chief of Staff core) built and tested in mock mode. Awaiting Oliver's live test and approval of the next milestone.
 
-Last updated: 2026-10-24
+Last updated: 2026-10-24 · Code: https://github.com/olivermikaelhochheim-maker/-Maverick
+
+Milestone order (agreed with Oliver 2026-10-24): **Chief of Staff core** (old Phase 3 + read-only Google Calendar from Phase 4) came before voice, because Oliver's priorities are proactive thinking, suggestions and accountability.
 
 ---
 
 ## Completed
 
-### Phase 0: Discovery & scaffolding
-- pnpm TypeScript monorepo: `packages/core` (logic) + `apps/web` (Next.js 16 PWA)
-- `pnpm configure`: generates the encryption key and setup code, stores secrets in the macOS Keychain (or a 600-permission `.env`), optional API key
-- `pnpm check`: plain-English install health check
-- Docs: architecture, threat model, budget model, 7 architecture decision records (`docs/adr/`)
-- Free offline **mock mode**, so the whole app runs and demos with no API key
+### Milestone 0: Discovery & scaffolding
+Monorepo, `pnpm configure` / `pnpm check`, docs, ADRs, free mock mode.
 
-### Phase 1: Conversational MVP
-- Single-user account: first-run setup protected by a setup code; scrypt passwords; hashed server-side sessions; lockout; per-device sign-out; password change
-- Streaming text chat with conversation history, rename and delete; Stop button / Esc interrupts
-- Model abstraction (`LLMProvider`) with an Anthropic provider (official SDK, streaming, prompt caching, server-side refusal fallback) and a mock provider
-- Cost-aware routing: Haiku 5.5 for quick exchanges, Sonnet 5.5 for analysis, Opus 5.5 on "Think deeper". Each reply shows its model, the reason and the cost.
-- Budget: per-call cost ledger; hard monthly + daily caps enforced *before* any call; `max_tokens` clamped to the remaining budget; soft limit switches to the cheapest model; interrupted calls charged at an estimate
-- Encryption at rest (AES-256-GCM) for messages, titles and settings
-- Audit log, redacted structured logs, security headers (CSP, frame-deny, microphone disabled), CSRF origin checks
-- Screens: Command Center, Conversation, Usage & Budget, Security, Settings, plus locked roadmap items (Memory Vault, Projects, Zorza CEO) that are visibly marked as later phases
-- Responsive dark navy/cyan UI, circular status orb, reduced-motion support, keyboard navigation, skip link, iPhone safe areas, Add-to-Home-Screen manifest
+### Milestone 1: Conversational MVP
+Single-user auth, streaming chat, model routing (Haiku/Sonnet/Opus 5.5), hard budget limits, encryption at rest, audit log, responsive dark UI, PWA.
 
-## Test results (2026-10-24, run in a Linux cloud container)
+### Milestone 2: Chief of Staff core
+- **Memory Vault**: categories, provenance (who/where/when), confidence, per-memory retention and expiry, pin, edit, delete, search, export. Each reply records which memories it used and why ("Context used").
+- **Goals & tasks**: horizons and measurable metrics; tasks with priority, due date, reminder time and linked goal; ranked by urgency.
+- **Suggestion inbox**: Maverick proposes memories, tasks, goals and life/work actions through four proposal-only tools. Nothing takes effect until Oliver accepts (optionally after editing). Chips in chat, inbox on Command Center and Goals & Tasks.
+- **Proactive persona**: Maverick volunteers labelled suggestions in conversation; Oliver decides.
+- **Briefings**: morning (05:30), evening check-in (21:00), weekly review (Sun 18:00), in Oslo time. Written by Sonnet 5.5, or a free template from real data when no model is available or the budget is at the soft limit. "Brief me now" on demand.
+- **Scheduler**: in-process, once a minute, idempotent, catches up after the Mac sleeps.
+- **Notifications**: Web Push to iPhone/Mac with explicit consent, per-device opt-in, quiet hours 22:00–05:00 (reminders held until they end), daily cap, test button.
+- **Google Calendar (read-only)**: OAuth with PKCE, read-only scope verified, tokens encrypted, automatic refresh, "needs reconnecting" state, disconnect revokes at Google. Agenda on the Command Center and in briefings and chat context. Demo calendar for testing.
+- **Data export**: everything, decrypted, as JSON.
+- Oliver's answers applied: Oslo time zone, NOK revenue goal, Google tools, he/him, daily rhythm.
+
+## Test results (2026-10-24, Linux cloud container)
 | Suite | Result |
 |---|---|
 | TypeScript typecheck (core + web) | ✅ pass |
-| Core unit + integration (Vitest, real embedded Postgres) | ✅ 56 / 56 |
-| Browser end-to-end (Playwright, production build; iPhone 15 + desktop) | ✅ 21 passed, 1 skipped by design (desktop run reuses the account the iPhone run created) |
+| Core unit + integration (Vitest, real embedded Postgres) | ✅ 95 / 95 |
+| Browser end-to-end (Playwright, production build; iPhone 15 + desktop) | ✅ 33 passed, 1 skipped by design |
 
-Covered: encryption and tamper detection, password and session lifecycle, lockout (incl. rotating IPs), budget refusal/clamping/soft-downgrade, routing, settings validation and encryption at rest, chat persistence, history windowing, Stop mid-reply (partial saved, cost recorded), provider failures, prompt-injection boundary, CSRF block, security headers, no sideways scrolling on any page at iPhone width.
+New coverage: Oslo DST time maths and quiet hours across midnight; memory provenance, expiry, selection reasons and token cap; task ranking and reminders; accept/edit/dismiss semantics; proposal tool validation and limits; strict-schema compatibility; chat context (memories, goals, tasks, calendar) and tool events; Google token refresh, unselected calendars, declined events, revoked tokens, missing-scope refusal; push consent, quiet hours, daily cap, dead subscriptions, endpoint allowlist; briefing template vs. model, budget fallback, once-per-day scheduling, catch-up, opt-out; export.
 
-Bugs the tests caught and that are now fixed:
-1. Pressing Stop abandoned the server-side chat pipeline, so the partial reply was never saved and **the call's cost was never recorded** (a budget leak).
-2. A Settings number field had a step value that made the browser silently refuse to save.
-3. Long audit-log entries made pages scroll sideways on iPhone.
+Bugs found by tests and fixed this milestone: suggestion chips vanished on reload; Settings scrolled sideways on iPhone; notification log and cap check used different clocks; memory-match reasons showed word stems instead of words.
 
-## ⚠️ Not yet verified
-- **Live Claude calls.** No API key was available in the build environment. The Anthropic provider type-checks against the official SDK, but its first real request happens on your Mac. First thing to do after adding a key: send one message on each tier (normal message, an analytical question, and one with "Think deeper") and confirm replies and costs appear.
-- **Running on macOS itself** (built and tested on Linux). The Keychain integration is macOS-only and untested here; the `.env` path is tested.
-- **A real iPhone** (tested with Playwright's iPhone 15 emulation, not a physical device).
+## ⚠️ Not yet verified (needs Oliver's Mac and accounts)
+- **Live Claude calls**, including the tool round trip (no API key in the build environment). First test: ask Maverick to remember something and to plan your day; check that a chip appears and replies stream.
+- **Google sign-in against real Google** (the flow is tested against a simulated Google).
+- **Real push delivery to an iPhone** (tested with a simulated push service).
+- **`tailscale serve`**: whether it passes the original host header through. `MAVERICK_ALLOWED_ORIGINS` covers the case where it doesn't.
+- macOS Keychain storage; a physical iPhone.
 
-## Decisions from Oliver (2026-10-24)
-| Topic | Answer | Applied |
-|---|---|---|
-| $50 budget | Excludes Claude Code | `docs/budget.md` |
-| Model provider | Will create an Anthropic account | Setup guide in README |
-| Tools | Google Calendar, Gmail; no notes app or CRM | Phase 4 = Google integrations; Maverick can become the notes/CRM layer |
-| Zorza target | NOK, revenue | "About me" defaults; **amount still to confirm** (see open questions) |
-| Time zone | Europe/Oslo | Default setting |
-| Briefing / quiet hours | 05:30 / 22:00–05:00 | Stored in Settings → Daily rhythm; used from Phase 3 |
-| iPhone | Browser app (PWA) is fine for now | No native app yet |
-| Autonomy | Maverick should think proactively and suggest actions in life situations | Persona now volunteers labelled suggestions in chat; proactive suggestions outside chat are planned (see next tasks) |
-
-## Open questions
-- GitHub repo name (owner/repo) + Claude GitHub App access, so the code can be pushed
-- Zorza target: 100,000 NOK/month, or the NOK equivalent of $100,000 (about 1 million NOK)? Current monthly revenue, clients, average deal size
-- Mac model: Apple menu → About This Mac
-- Which data must stay only on the Mac vs. allowed in encrypted cloud storage
-- Voice: pick from samples when voice work starts
+## Open questions for Oliver
+1. Zorza target: **100,000 NOK/month**, or the NOK equivalent of $100,000 (about 1 million NOK)? Current monthly revenue, client count, average deal size.
+2. Mac model and macOS version (Apple menu → About This Mac).
+3. Which personal or financial data must stay only on the Mac vs. allowed in encrypted cloud storage (matters for the cloud move).
 
 ## Commands
 ```bash
-pnpm install          # once, and after updating the code
-pnpm configure        # once; re-run to add an API key
-pnpm build && pnpm start   # run Maverick (http://localhost:3000)
-pnpm check            # health check
-pnpm test             # unit/integration tests
-pnpm test:e2e         # browser tests (after pnpm build)
+pnpm install               # after updating the code
+pnpm configure             # add/change API key, Google credentials
+pnpm build && caffeinate -is pnpm start    # run Maverick, keep the Mac awake on power
+pnpm check                 # health check
+pnpm test                  # unit/integration tests
+pnpm test:e2e              # browser tests (after pnpm build)
 ```
 
-## Monthly cost estimate (model usage, Phase 1)
-Light ~$2.50 · typical ~$7.50 · heavy ~$35 (capped at $40 by default). Hosting $0 (runs on the Mac). Details: `docs/budget.md`.
+## Monthly cost estimate
+Typical ~$10 (chat ~$8 + briefings ~$1.20 + extra context ~$0.60); light ~$3; heavy capped at $40. Hosting $0 (Mac), Google API $0, push $0. Details: `docs/budget.md`.
 
-## Next tasks
-**Phase 1 follow-ups (small):**
-- Verify live Claude calls with Oliver's key; tune routing rules from real use
-- Budget periods in Oliver's time zone instead of UTC
-- Export all data (JSON) from Settings
+## Next milestones (proposed)
+**3. Voice:** push-to-talk with a visible microphone state, streaming speech-to-text → Claude → licensed British male voice, interruptible, text fallback, latency measured. Starts with 3–4 voice samples and real vendor prices for Oliver to choose from.
 
-**Phase 2: Voice (needs approval + voice choice):**
-- Push-to-talk in the browser with a clearly visible microphone state; text fallback always available
-- Streaming STT → Claude → streaming TTS, interruptible playback, measured latency
-- Vendor shortlist with costs and 3–4 licensed British male voice samples for Oliver to choose from
-- Microphone permission enabled only on the conversation page, only after an explicit opt-in
-- Later: opt-in local "Hey Maverick" wake word on the Mac only
+**4. Gmail + calendar writes (with confirmation):** read and summarise email, draft replies; every send or calendar change waits in an approval queue. Plus a cloud move (always-on briefings without the Mac) and passkeys before any public exposure.
 
-**Before any public-internet deployment:** passkeys or TOTP second factor (ADR 0004).
+**5. Zorza CEO Advisor:** KPI definitions, client pipeline (Maverick as the light CRM Oliver doesn't have yet), revenue decomposition from real NOK baselines, weekly CEO review.
+
+Small follow-ups: budget periods in Oslo time instead of UTC; edit task titles inline; snooze for reminders.

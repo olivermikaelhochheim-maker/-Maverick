@@ -159,6 +159,15 @@ export class SuggestionStore {
     return rows.map((r) => this.toSuggestion(r));
   }
 
+  /** Suggestions made in one conversation (any status), oldest first. */
+  async forConversation(userId: string, conversationId: string): Promise<Suggestion[]> {
+    const { rows } = await this.db.query<Row>(
+      "SELECT * FROM suggestions WHERE user_id = $1 AND source_ref = $2 ORDER BY created_at ASC",
+      [userId, conversationId],
+    );
+    return rows.map((r) => this.toSuggestion(r));
+  }
+
   /**
    * Oliver accepts: the suggestion takes effect now.
    * memory -> Memory Vault (keeps the model's confidence and its source)
