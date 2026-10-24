@@ -1,0 +1,18 @@
+{
+  "name": "maverick",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Maverick: Oliver's private, voice-first AI chief of staff.",
+  "packageManager": "pnpm@10.28.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "configure": "node scripts/setup.mjs",
+    "dev": "pnpm --filter @maverick/web dev",
+    "build": "pnpm --filter @maverick/web build",
+    "start": "pnpm --filter @maverick/web start",
+    "test": "pnpm --filter @maverick/core test",
+    "test:e2e": "pnpm --filter @maverick/web test:e2e",
+    "typecheck": "pnpm -r typecheck",
+    "check": "node scripts/doctor.mjs"
+  }
+}
