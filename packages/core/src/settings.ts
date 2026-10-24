@@ -27,6 +27,13 @@ export interface Settings {
     monthlyHardUsd: number;
     dailyHardUsd: number;
   };
+  /** Oliver's daily rhythm. Stored now; the scheduler that uses it arrives in Phase 3. */
+  schedule: {
+    /** Local time for the morning briefing, "HH:MM". */
+    briefingTime: string;
+    /** No proactive messages between start and end (local time, may span midnight). */
+    quietHours: { start: string; end: string };
+  };
   ui: { reduceMotion: boolean };
 }
 
@@ -34,17 +41,20 @@ export interface Settings {
  * Seeded from Oliver's initial brief (2026-10-24). These are facts Oliver
  * stated directly, not model guesses, and they can be edited or cleared in Settings.
  */
-export const DEFAULT_ABOUT_ME = `Source: Oliver's initial brief to Maverick, 24 Oct 2026.
-- Runs Zorza Marketing. 1-year goal: grow toward $100,000/month (currency and revenue-vs-profit not yet confirmed).
+export const DEFAULT_ABOUT_ME = `Source: Oliver's brief and answers to Maverick, 24 Oct 2026.
+- Lives in Norway (Oslo time). Money amounts for Zorza are in NOK unless stated otherwise.
+- Runs Zorza Marketing. 1-year goal: grow revenue (not profit) toward 100,000/month in NOK. Exact target amount and current baseline not yet confirmed.
 - 3-year goal: learn about and begin stock and real-estate investing when financially appropriate.
 - 5-year goal: multiple sustainable income streams and meaningful time freedom.
 - Personal goals: pilot's license, financial independence, mental resilience, wisdom, athletic physique.
 - Main friction: procrastination, lack of focus, lack of clarity.
 - Wants a mentor who is wise, disciplined, reassuring and accountable, never shaming.
-- Uses a MacBook and an iPhone.`;
+- Wants Maverick to think proactively and suggest actions in life situations, with Oliver deciding.
+- Uses a MacBook and an iPhone, Google Calendar and Gmail. No notes app or CRM yet.
+- Daily rhythm: morning briefing at 05:30; quiet hours 22:00-05:00.`;
 
 export const DEFAULT_SETTINGS: Settings = {
-  timezone: "UTC",
+  timezone: "Europe/Oslo",
   aboutMe: DEFAULT_ABOUT_ME,
   personality: { wit: "medium", directness: "balanced" },
   routing: {
@@ -54,6 +64,7 @@ export const DEFAULT_SETTINGS: Settings = {
     maxOutputTokens: 4_000,
   },
   budget: { monthlySoftUsd: 30, monthlyHardUsd: 40, dailyHardUsd: 5 },
+  schedule: { briefingTime: "05:30", quietHours: { start: "22:00", end: "05:00" } },
   ui: { reduceMotion: false },
 };
 
@@ -92,6 +103,12 @@ export function validateSettings(s: Settings): Settings {
   num(s.budget.monthlyHardUsd, 0, 10_000, "Monthly hard limit");
   num(s.budget.dailyHardUsd, 0, 10_000, "Daily hard limit");
   if (s.budget.monthlySoftUsd > s.budget.monthlyHardUsd) fail("The soft limit must not exceed the hard limit.");
+  const hhmm = (v: unknown, label: string) => {
+    if (typeof v !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(v)) fail(`${label} must be a time like 05:30.`);
+  };
+  hhmm(s.schedule.briefingTime, "Briefing time");
+  hhmm(s.schedule.quietHours.start, "Quiet hours start");
+  hhmm(s.schedule.quietHours.end, "Quiet hours end");
   if (typeof s.ui.reduceMotion !== "boolean") fail("Invalid motion setting.");
   return s;
 }

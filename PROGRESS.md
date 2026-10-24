@@ -1,6 +1,6 @@
 # Maverick: progress log
 
-## Status: Phase 0 + Phase 1 built and tested (mock mode). Waiting on Oliver's approval and answers before Phase 2.
+## Status: Phase 0 + Phase 1 built and tested (mock mode). Oliver's answers applied. Awaiting approval of the next milestone.
 
 Last updated: 2026-10-24
 
@@ -30,7 +30,7 @@ Last updated: 2026-10-24
 | Suite | Result |
 |---|---|
 | TypeScript typecheck (core + web) | ✅ pass |
-| Core unit + integration (Vitest, real embedded Postgres) | ✅ 54 / 54 |
+| Core unit + integration (Vitest, real embedded Postgres) | ✅ 56 / 56 |
 | Browser end-to-end (Playwright, production build; iPhone 15 + desktop) | ✅ 21 passed, 1 skipped by design (desktop run reuses the account the iPhone run created) |
 
 Covered: encryption and tamper detection, password and session lifecycle, lockout (incl. rotating IPs), budget refusal/clamping/soft-downgrade, routing, settings validation and encryption at rest, chat persistence, history windowing, Stop mid-reply (partial saved, cost recorded), provider failures, prompt-injection boundary, CSRF block, security headers, no sideways scrolling on any page at iPhone width.
@@ -45,8 +45,24 @@ Bugs the tests caught and that are now fixed:
 - **Running on macOS itself** (built and tested on Linux). The Keychain integration is macOS-only and untested here; the `.env` path is tested.
 - **A real iPhone** (tested with Playwright's iPhone 15 emulation, not a physical device).
 
-## Current blockers (need Oliver)
-See "Questions" in the latest hand-off message. In short: Mac model/macOS/Xcode, whether $50 includes Claude Code, API account, which calendar/email/task tools, Zorza currency + revenue vs. profit + baseline, time zone and quiet hours, PWA vs. native, voice vendor, automatic vs. confirm-only actions, on-device vs. cloud data.
+## Decisions from Oliver (2026-10-24)
+| Topic | Answer | Applied |
+|---|---|---|
+| $50 budget | Excludes Claude Code | `docs/budget.md` |
+| Model provider | Will create an Anthropic account | Setup guide in README |
+| Tools | Google Calendar, Gmail; no notes app or CRM | Phase 4 = Google integrations; Maverick can become the notes/CRM layer |
+| Zorza target | NOK, revenue | "About me" defaults; **amount still to confirm** (see open questions) |
+| Time zone | Europe/Oslo | Default setting |
+| Briefing / quiet hours | 05:30 / 22:00–05:00 | Stored in Settings → Daily rhythm; used from Phase 3 |
+| iPhone | Browser app (PWA) is fine for now | No native app yet |
+| Autonomy | Maverick should think proactively and suggest actions in life situations | Persona now volunteers labelled suggestions in chat; proactive suggestions outside chat are planned (see next tasks) |
+
+## Open questions
+- GitHub repo name (owner/repo) + Claude GitHub App access, so the code can be pushed
+- Zorza target: 100,000 NOK/month, or the NOK equivalent of $100,000 (about 1 million NOK)? Current monthly revenue, clients, average deal size
+- Mac model: Apple menu → About This Mac
+- Which data must stay only on the Mac vs. allowed in encrypted cloud storage
+- Voice: pick from samples when voice work starts
 
 ## Commands
 ```bash

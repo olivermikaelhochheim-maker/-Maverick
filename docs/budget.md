@@ -29,4 +29,4 @@ The default hard cap ($40) stops the heavy case from passing $40 in model costs.
 
 **Tension to flag early:** real-time voice with a premium British voice plus always-on cloud hosting could take the total to roughly $40–70 at heavy use. If that happens, the plan is text-first with push-to-talk, plus a cheaper TTS tier, rather than cutting model quality.
 
-**Open question for Oliver:** does the $50 include the Claude Code subscription used to build Maverick? This model assumes it doesn't.
+**Confirmed by Oliver (2026-10-24):** the $50 covers Maverick's running costs only; the Claude Code subscription is separate.

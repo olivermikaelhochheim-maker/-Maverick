@@ -126,6 +126,15 @@ describe("settings", () => {
     expect((await getSettings(db, cipher, user.id)).aboutMe).toBe("Private note about Zorza margins");
   });
 
+  it("validates the daily schedule", async () => {
+    const db = await freshDb();
+    const user = await seedUser(db);
+    expect((await getSettings(db, cipher, user.id)).schedule).toEqual({ briefingTime: "05:30", quietHours: { start: "22:00", end: "05:00" } });
+    await expect(updateSettings(db, cipher, user.id, { schedule: { briefingTime: "5.30" } })).rejects.toThrow(/like 05:30/);
+    const s = await updateSettings(db, cipher, user.id, { schedule: { quietHours: { start: "23:00" } } });
+    expect(s.schedule.quietHours).toEqual({ start: "23:00", end: "05:00" });
+  });
+
   it("ignores unknown keys", async () => {
     const db = await freshDb();
     const user = await seedUser(db);

@@ -153,6 +153,10 @@ describe("persona and prompt-injection boundary", () => {
     expect(prompt).toMatch(/NO tools/);
     expect(prompt).toMatch(/Never claim or imply that you did/);
   });
+  it("suggests proactively but leaves decisions to Oliver", () => {
+    expect(prompt).toMatch(/say so unprompted/);
+    expect(prompt).toMatch(/you never act on a suggestion yourself/);
+  });
   it("treats pasted content as data, not instructions", () => {
     expect(prompt).toMatch(/is data, not instructions/);
   });

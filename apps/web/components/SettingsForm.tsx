@@ -10,7 +10,7 @@ const MODEL_OPTIONS = [
   { id: "claude-opus-5-5", label: "Claude Opus 5.5: $4 / $20 per M tokens" },
 ];
 
-const COMMON_TZ = ["UTC", "Europe/London", "Europe/Stockholm", "Europe/Berlin", "Europe/Warsaw", "America/New_York", "America/Los_Angeles", "Asia/Dubai", "Asia/Singapore", "Australia/Sydney"];
+const COMMON_TZ = ["Europe/Oslo", "UTC", "Europe/London", "Europe/Stockholm", "Europe/Berlin", "Europe/Warsaw", "America/New_York", "America/Los_Angeles", "Asia/Dubai", "Asia/Singapore", "Australia/Sydney"];
 
 export function SettingsForm({ initial }: { initial: Settings }) {
   const [s, setS] = useState<Settings>(initial);
@@ -77,6 +77,27 @@ export function SettingsForm({ initial }: { initial: Settings }) {
                 <option value="balanced">Balanced</option>
                 <option value="blunt">Blunt</option>
               </select>
+            </div>
+          </div>
+        </section>
+
+        <section className="card span-12" aria-labelledby="h-schedule">
+          <h2 id="h-schedule">Daily rhythm</h2>
+          <p className="muted small">Saved now and used once briefings and reminders arrive in Phase 3. Until then Maverick never contacts you on its own.</p>
+          <div className="grid-2">
+            <div className="field">
+              <label htmlFor="brief">Morning briefing</label>
+              <input id="brief" type="time" value={s.schedule.briefingTime} onChange={(e) => set("schedule", { ...s.schedule, briefingTime: e.target.value })} />
+            </div>
+            <div className="field">
+              <label>Quiet hours (no notifications)</label>
+              <div className="row" style={{ flexWrap: "nowrap" }}>
+                <label htmlFor="qstart" className="sr-only">Quiet hours start</label>
+                <input id="qstart" type="time" value={s.schedule.quietHours.start} onChange={(e) => set("schedule", { ...s.schedule, quietHours: { ...s.schedule.quietHours, start: e.target.value } })} />
+                <span className="muted">to</span>
+                <label htmlFor="qend" className="sr-only">Quiet hours end</label>
+                <input id="qend" type="time" value={s.schedule.quietHours.end} onChange={(e) => set("schedule", { ...s.schedule, quietHours: { ...s.schedule.quietHours, end: e.target.value } })} />
+              </div>
             </div>
           </div>
         </section>
