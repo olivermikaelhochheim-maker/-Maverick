@@ -103,6 +103,133 @@ export const MIGRATIONS: { id: string; sql: string }[] = [
       CREATE INDEX audit_log_user_time_idx ON audit_log(user_id, created_at DESC);
     `,
   },
+  {
+    id: "0002_chief_of_staff",
+    sql: `
+      -- Memory Vault. Content is encrypted; metadata stays queryable.
+      CREATE TABLE memories (
+        id           TEXT PRIMARY KEY,
+        user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        category     TEXT NOT NULL CHECK (category IN ('profile','preference','goal','project','decision','episodic','ephemeral')),
+        content_enc  TEXT NOT NULL,
+        source       TEXT NOT NULL CHECK (source IN ('user','conversation','briefing','import')),
+        source_ref   TEXT,
+        confidence   REAL NOT NULL DEFAULT 1 CHECK (confidence >= 0 AND confidence <= 1),
+        retention    TEXT NOT NULL DEFAULT 'permanent' CHECK (retention IN ('permanent','1y','90d','30d','7d')),
+        expires_at   TIMESTAMPTZ,
+        pinned       BOOLEAN NOT NULL DEFAULT false,
+        created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+        last_used_at TIMESTAMPTZ
+      );
+      CREATE INDEX memories_user_idx ON memories(user_id, category);
+
+      -- Which memories were given to the model for a reply, and why.
+      CREATE TABLE message_context (
+        message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+        memory_id  TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+        reason     TEXT NOT NULL,
+        PRIMARY KEY (message_id, memory_id)
+      );
+
+      CREATE TABLE goals (
+        id          TEXT PRIMARY KEY,
+        user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title_enc   TEXT NOT NULL,
+        detail_enc  TEXT,
+        metric_enc  TEXT,
+        horizon     TEXT NOT NULL DEFAULT 'other' CHECK (horizon IN ('1y','3y','5y','personal','other')),
+        target_date DATE,
+        status      TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','done','paused','dropped')),
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+
+      CREATE TABLE tasks (
+        id           TEXT PRIMARY KEY,
+        user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        goal_id      TEXT REFERENCES goals(id) ON DELETE SET NULL,
+        title_enc    TEXT NOT NULL,
+        notes_enc    TEXT,
+        priority     INTEGER NOT NULL DEFAULT 2 CHECK (priority BETWEEN 1 AND 3),
+        due_date     DATE,
+        remind_at    TIMESTAMPTZ,
+        reminded_at  TIMESTAMPTZ,
+        status       TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','done','dropped')),
+        source       TEXT NOT NULL DEFAULT 'user' CHECK (source IN ('user','suggestion')),
+        created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+        completed_at TIMESTAMPTZ
+      );
+      CREATE INDEX tasks_user_status_idx ON tasks(user_id, status);
+      CREATE INDEX tasks_remind_idx ON tasks(remind_at) WHERE reminded_at IS NULL AND status = 'open';
+
+      -- Maverick proposes; Oliver decides. Nothing here takes effect until accepted.
+      CREATE TABLE suggestions (
+        id          TEXT PRIMARY KEY,
+        user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind        TEXT NOT NULL CHECK (kind IN ('memory','task','goal','action')),
+        title_enc   TEXT NOT NULL,
+        body_enc    TEXT,
+        payload_enc TEXT NOT NULL,
+        status      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','dismissed','expired')),
+        source      TEXT NOT NULL CHECK (source IN ('conversation','briefing')),
+        source_ref  TEXT,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+        decided_at  TIMESTAMPTZ
+      );
+      CREATE INDEX suggestions_user_status_idx ON suggestions(user_id, status, created_at DESC);
+
+      -- One row per scheduled briefing actually produced (unique = idempotent).
+      CREATE TABLE briefings (
+        id              TEXT PRIMARY KEY,
+        user_id         TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind            TEXT NOT NULL CHECK (kind IN ('morning','evening','weekly')),
+        local_date      TEXT NOT NULL,
+        conversation_id TEXT REFERENCES conversations(id) ON DELETE SET NULL,
+        status          TEXT NOT NULL CHECK (status IN ('done','skipped')),
+        note            TEXT,
+        created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+        UNIQUE (user_id, kind, local_date)
+      );
+
+      CREATE TABLE push_subscriptions (
+        id              TEXT PRIMARY KEY,
+        user_id         TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        endpoint_hash   TEXT NOT NULL UNIQUE,
+        data_enc        TEXT NOT NULL,
+        user_agent      TEXT,
+        failures        INTEGER NOT NULL DEFAULT 0,
+        created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+        last_success_at TIMESTAMPTZ
+      );
+
+      CREATE TABLE notifications (
+        id         TEXT PRIMARY KEY,
+        user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind       TEXT NOT NULL,
+        status     TEXT NOT NULL CHECK (status IN ('sent','failed','suppressed')),
+        reason     TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      CREATE INDEX notifications_user_time_idx ON notifications(user_id, created_at);
+
+      -- Connected accounts. Tokens are encrypted.
+      CREATE TABLE integrations (
+        id                TEXT PRIMARY KEY,
+        user_id           TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        provider          TEXT NOT NULL CHECK (provider IN ('google')),
+        scopes            TEXT NOT NULL,
+        account_email_enc TEXT,
+        tokens_enc        TEXT NOT NULL,
+        status            TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','needs_reauth')),
+        last_error        TEXT,
+        created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+        UNIQUE (user_id, provider)
+      );
+    `,
+  },
 ];
 
 export async function migrate(db: Db): Promise<string[]> {

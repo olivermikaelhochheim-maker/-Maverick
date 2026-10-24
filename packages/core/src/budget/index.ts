@@ -62,8 +62,11 @@ export function planCall(
   price: ModelPrice,
   estimatedInputTokens: number,
   requestedMaxOutputTokens: number,
+  /** Model calls this request may make (tool round trips each add one). */
+  calls = 1,
 ): BudgetPlan {
-  const remaining = Math.min(spend.monthHardUsd - spend.monthUsd, spend.dailyHardUsd - spend.todayUsd);
+  // Budget per call: each round trip re-sends the input and may produce max output.
+  const remaining = Math.min(spend.monthHardUsd - spend.monthUsd, spend.dailyHardUsd - spend.todayUsd) / Math.max(1, calls);
   const inputCost = (estimatedInputTokens * price.inputPerMTok) / 1_000_000;
   const MIN_USEFUL_OUTPUT = 256;
 
@@ -81,7 +84,7 @@ export function planCall(
   return {
     maxOutputTokens,
     estimatedInputCostUsd: inputCost,
-    worstCaseCostUsd: inputCost + (maxOutputTokens * price.outputPerMTok) / 1_000_000,
+    worstCaseCostUsd: (inputCost + (maxOutputTokens * price.outputPerMTok) / 1_000_000) * Math.max(1, calls),
   };
 }
 

@@ -5,8 +5,15 @@ import { getSettings, type Tier } from "../settings";
 import { getSpend, noteSoftLimitCrossing, planCall, recordUsage, type SpendSummary } from "../budget";
 import { costUsd, estimateTokens, modelInfo } from "../llm/catalog";
 import { routeMessage } from "../llm/router";
-import { ProviderError, type ChatTurn } from "../llm/types";
+import { ProviderError, type ChatTurn, type ToolDef } from "../llm/types";
+import { proposalTools } from "../llm/tools";
 import type { ProviderSet } from "../llm";
+import { MemoryStore, renderMemories, type MemoryCategory } from "../memory";
+import { PlanningStore } from "../planning";
+import { SuggestionStore } from "../suggestions";
+import { AgendaService } from "../integrations/calendar";
+import { IntegrationStore } from "../integrations/store";
+import { renderState, snapshot } from "../context";
 import { BudgetExceededError, UserFacingError } from "../util/errors";
 import { formatLocalNow } from "../util/time";
 import { log } from "../util/logger";
@@ -14,6 +21,15 @@ import { ConversationStore, windowHistory } from "./conversations";
 import { buildSystemPrompt, buildTurnContext } from "./persona";
 
 export const MAX_USER_MESSAGE_CHARS = 20_000;
+/** Tool round trips allowed per reply (each is another model call). */
+export const MAX_TOOL_ROUNDS = 2;
+
+export interface ContextItem {
+  id: string;
+  category: MemoryCategory;
+  content: string;
+  reason: string;
+}
 
 export type ChatStreamEvent =
   | {
@@ -25,8 +41,10 @@ export type ChatStreamEvent =
       routeReason: string;
       mode: "live" | "mock";
       warnings: string[];
+      context: ContextItem[];
     }
   | { type: "delta"; text: string }
+  | { type: "suggestion"; id: string; kind: string; title: string }
   | {
       type: "done";
       assistantMessageId: string;
@@ -39,17 +57,44 @@ export type ChatStreamEvent =
     }
   | { type: "error"; code: string; message: string; assistantMessageId?: string; spend?: SpendSummary };
 
-const EFFORT: Record<Tier, "low" | "medium" | "high"> = { fast: "low", standard: "medium", deep: "high" };
+export const EFFORT: Record<Tier, "low" | "medium" | "high"> = { fast: "low", standard: "medium", deep: "high" };
+
+export interface ChatDeps {
+  memory: MemoryStore;
+  planning: PlanningStore;
+  suggestions: SuggestionStore;
+  agenda: AgendaService;
+}
+
+export function defaultDeps(db: Db, cipher: FieldCipher): ChatDeps {
+  const memory = new MemoryStore(db, cipher);
+  const planning = new PlanningStore(db, cipher);
+  return {
+    memory,
+    planning,
+    suggestions: new SuggestionStore(db, cipher, memory, planning),
+    agenda: new AgendaService(null, new IntegrationStore(db, cipher)),
+  };
+}
+
+/**
+ * Opening line for conversations Maverick started (e.g. the morning briefing).
+ * The API requires the first turn to be the user's, so we add a labelled stand-in.
+ */
+export const SYSTEM_OPENED_TURN = "[Maverick opened this conversation on schedule. Oliver is replying to it below.]";
 
 export class ChatService {
   readonly conversations: ConversationStore;
+  readonly deps: ChatDeps;
 
   constructor(
     private readonly db: Db,
     private readonly cipher: FieldCipher,
     private readonly providers: ProviderSet,
+    deps?: ChatDeps,
   ) {
     this.conversations = new ConversationStore(db, cipher);
+    this.deps = deps ?? defaultDeps(db, cipher);
   }
 
   get mode() {
@@ -58,7 +103,7 @@ export class ChatService {
 
   /**
    * Send one user message and stream Maverick's reply.
-   * Order: validate -> budget check -> persist user turn -> stream -> meter -> persist reply.
+   * Order: validate -> budget check -> persist user turn -> stream (with proposal tools) -> meter -> persist reply.
    * A budget refusal happens before anything is sent to a provider.
    */
   async *send(input: {
@@ -90,7 +135,14 @@ export class ChatService {
     if (conversationId) {
       const prior = await this.conversations.messages(user.id, conversationId, 200);
       history = prior.filter((m) => m.status !== "error" && m.content.trim()).map((m) => ({ role: m.role, content: m.content }));
+      if (history[0]?.role === "assistant") history.unshift({ role: "user", content: SYSTEM_OPENED_TURN });
     }
+
+    // Context: memories (with reasons) + current state. Sent per turn, not in the cached system prompt.
+    const lastAssistant = [...history].reverse().find((t) => t.role === "assistant")?.content ?? "";
+    const selected = await this.deps.memory.selectForPrompt(user.id, `${text}\n${lastAssistant.slice(0, 1000)}`);
+    const state = await snapshot(this.deps, user.id, settings);
+    const contextText = [renderMemories(selected, user.displayName), renderState(state, settings.timezone, user.displayName)].filter(Boolean).join("\n\n");
 
     const system = buildSystemPrompt(settings, user.displayName);
     const warnings: string[] = [];
@@ -99,13 +151,15 @@ export class ChatService {
         `Month-to-date spend ($${spendBefore.monthUsd.toFixed(2)}) is past your soft limit ($${spendBefore.monthSoftUsd.toFixed(2)}). Using the fast model.`,
       );
     }
-    const turnContext = buildTurnContext(user.displayName, formatLocalNow(settings.timezone));
+    const turnContext = `${buildTurnContext(user.displayName, formatLocalNow(settings.timezone))}\n\n${contextText}`;
     const turns = windowHistory([...history, { role: "user" as const, content: text }], settings.routing.historyTokenBudget, estimateTokens);
-    const estInput = estimateTokens(system) + estimateTokens(turnContext) + turns.reduce((n, t) => n + estimateTokens(t.content), 0);
+    if (turns[0]?.role === "assistant") turns.unshift({ role: "user", content: SYSTEM_OPENED_TURN });
+    const estInput = estimateTokens(system) + estimateTokens(turnContext) + turns.reduce((n, t) => n + estimateTokens(t.content), 0) + 900; // + tool schemas
 
+    const useTools = settings.proactive.suggestFromChat;
     let plan;
     try {
-      plan = planCall(spendBefore, info.price, estInput, settings.routing.maxOutputTokens);
+      plan = planCall(spendBefore, info.price, estInput, settings.routing.maxOutputTokens, useTools ? 1 + MAX_TOOL_ROUNDS : 1);
     } catch (err) {
       if (err instanceof BudgetExceededError) {
         yield { type: "error", code: err.code, message: err.message, spend: spendBefore };
@@ -129,7 +183,14 @@ export class ChatService {
       routeReason: route.reason,
       mode: this.providers.mode,
       warnings,
+      context: selected.map((s) => ({ id: s.memory.id, category: s.memory.category, content: s.memory.content, reason: s.reason })),
     };
+
+    // Proposals made by tools are queued here and surfaced as events in stream order.
+    const proposed: { id: string; kind: string; title: string }[] = [];
+    const tools: ToolDef[] = useTools
+      ? proposalTools(this.deps.suggestions, { userId: user.id, source: "conversation", sourceRef: conversationId, onProposed: (s) => proposed.push(s) })
+      : [];
 
     const started = Date.now();
     let reply = "";
@@ -145,10 +206,19 @@ export class ChatService {
         maxOutputTokens: plan.maxOutputTokens,
         effort: EFFORT[route.tier],
         signal: input.signal,
+        tools,
+        maxToolRounds: MAX_TOOL_ROUNDS,
       })) {
         if (ev.type === "text") {
           reply += ev.text;
           yield { type: "delta", text: ev.text };
+        } else if (ev.type === "tool") {
+          while (proposed.length) yield { type: "suggestion", ...proposed.shift()! };
+          // Separate text written before and after a tool call.
+          if (reply && !reply.endsWith("\n")) {
+            reply += "\n\n";
+            yield { type: "delta", text: "\n\n" };
+          }
         } else {
           finished = { usage: ev.usage, stopReason: ev.stopReason };
         }
@@ -157,6 +227,7 @@ export class ChatService {
       failure = err instanceof ProviderError ? err : new ProviderError("unknown", "Unexpected error talking to the model.");
       if (!(err instanceof ProviderError)) log.error("chat_stream_failed", { error: err as Error });
     }
+    while (proposed.length) yield { type: "suggestion", ...proposed.shift()! };
     if (input.signal?.aborted && !failure) failure = new ProviderError("aborted", "Stopped.");
 
     const latencyMs = Date.now() - started;
@@ -175,7 +246,7 @@ export class ChatService {
     const status = failure ? (reply ? "partial" : "error") : "complete";
     const assistantMessageId = await this.conversations.addMessage(conversationId, {
       role: "assistant",
-      content: reply || (failure ? `[${failure.message}]` : ""),
+      content: reply.trim() || (failure ? `[${failure.message}]` : ""),
       status,
       provider: provider.id,
       model,
@@ -186,6 +257,8 @@ export class ChatService {
       costUsd: cost,
       latencyMs,
     });
+    await this.deps.memory.recordContext(assistantMessageId, selected);
+    await this.deps.memory.markUsed(selected.map((s) => s.memory.id));
 
     const spendAfter = await getSpend(this.db, user.id, settings);
     await noteSoftLimitCrossing(this.db, user.id, spendBefore, spendAfter);
@@ -197,6 +270,7 @@ export class ChatService {
       outTok: usage.outputTokens,
       costUsd: Number(costUsd(info.price, usage).toFixed(6)),
       latencyMs,
+      memories: selected.length,
       errorKind: failure?.kind,
     });
 

@@ -149,9 +149,10 @@ describe("history window", () => {
 
 describe("persona and prompt-injection boundary", () => {
   const prompt = buildSystemPrompt(DEFAULT_SETTINGS, "Oliver");
-  it("states that Maverick has no tools and must not claim actions", () => {
-    expect(prompt).toMatch(/NO tools/);
+  it("states what Maverick cannot do and that proposals are not actions", () => {
+    expect(prompt).toMatch(/What you CANNOT do/);
     expect(prompt).toMatch(/Never claim or imply that you did/);
+    expect(prompt).toMatch(/only a suggestion until Oliver accepts it/);
   });
   it("suggests proactively but leaves decisions to Oliver", () => {
     expect(prompt).toMatch(/say so unprompted/);

@@ -1,10 +1,16 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { BetaMessageParam } from "@anthropic-ai/sdk/resources/beta/messages/messages";
+import type {
+  BetaMessage,
+  BetaMessageParam,
+  BetaToolResultBlockParam,
+  BetaToolUnion,
+  BetaToolUseBlock,
+} from "@anthropic-ai/sdk/resources/beta/messages/messages";
 import { modelInfo } from "./catalog";
-import { ProviderError, type ChatEvent, type ChatRequest, type LLMProvider } from "./types";
+import { ProviderError, type ChatEvent, type ChatRequest, type LLMProvider, type ToolDef } from "./types";
 import { getSecret } from "../util/secrets";
 
-/** Claude via the official Anthropic SDK, streaming. */
+/** Claude via the official Anthropic SDK, streaming, with a bounded tool loop. */
 export class AnthropicProvider implements LLMProvider {
   readonly id = "anthropic";
   private client: Anthropic | null = null;
@@ -24,6 +30,8 @@ export class AnthropicProvider implements LLMProvider {
   async *stream(req: ChatRequest): AsyncIterable<ChatEvent> {
     const client = this.getClient();
     const info = modelInfo(req.model);
+    const tools = req.tools ?? [];
+    const maxRounds = req.maxToolRounds ?? 2;
 
     const messages: BetaMessageParam[] = req.messages.map((m) => ({ role: m.role, content: m.content }));
     if (req.turnContext) {
@@ -32,52 +40,82 @@ export class AnthropicProvider implements LLMProvider {
       messages.push({ role: "system", content: req.turnContext });
     }
 
-    const useFallback = info.supportsServerFallback;
-    let stream;
+    const apiTools = tools.map((t) => ({
+      name: t.name,
+      description: t.description,
+      input_schema: t.inputSchema,
+      strict: true,
+      eager_input_streaming: true,
+    })) as unknown as BetaToolUnion[];
+
+    const usage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
+    let final: BetaMessage | null = null;
+
     try {
-      stream = client.beta.messages.stream(
-        {
-          model: req.model,
-          max_tokens: req.maxOutputTokens,
-          system: req.system,
-          messages,
-          thinking: { type: "adaptive" },
-          output_config: { effort: req.effort ?? "medium" },
-          // Cache the conversation prefix automatically; later turns re-read it at ~10% of input price.
-          cache_control: { type: "ephemeral" },
-          // On a safety-classifier decline, let the API retry on Anthropic's recommended fallback model.
-          ...(useFallback ? { fallbacks: "default" as const, betas: ["server-side-fallback-2026-07-01"] } : {}),
-        },
-        { signal: req.signal },
-      );
+      for (let round = 0; ; round++) {
+        const stream = client.beta.messages.stream(
+          {
+            model: req.model,
+            max_tokens: req.maxOutputTokens,
+            system: req.system,
+            messages,
+            thinking: { type: "adaptive" },
+            output_config: { effort: req.effort ?? "medium" },
+            // Cache the conversation prefix automatically; later turns re-read it at ~10% of input price.
+            cache_control: { type: "ephemeral" },
+            ...(apiTools.length ? { tools: apiTools } : {}),
+            // On a safety-classifier decline, let the API retry on Anthropic's recommended fallback model.
+            ...(info.supportsServerFallback ? { fallbacks: "default" as const, betas: ["server-side-fallback-2026-07-01"] } : {}),
+          },
+          { signal: req.signal },
+        );
+        for await (const event of stream) {
+          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+            yield { type: "text", text: event.delta.text };
+          }
+        }
+        final = await stream.finalMessage();
+        usage.inputTokens += final.usage.input_tokens;
+        usage.outputTokens += final.usage.output_tokens;
+        usage.cacheReadTokens += final.usage.cache_read_input_tokens ?? 0;
+        usage.cacheWriteTokens += final.usage.cache_creation_input_tokens ?? 0;
+
+        if (final.stop_reason === "refusal") {
+          throw new ProviderError("refusal", "The model declined to answer this request.");
+        }
+        const toolUses = final.content.filter((b): b is BetaToolUseBlock => b.type === "tool_use");
+        // Never run tools from a truncated reply; never loop past the limit.
+        if (final.stop_reason !== "tool_use" || toolUses.length === 0 || round >= maxRounds) break;
+
+        // Echo the assistant turn back unchanged (including thinking blocks), then the results.
+        messages.push({ role: "assistant", content: final.content });
+        const results: BetaToolResultBlockParam[] = [];
+        for (const use of toolUses) {
+          const result = await runTool(tools, use);
+          yield { type: "tool", name: use.name, ok: result.ok };
+          results.push({ type: "tool_result", tool_use_id: use.id, content: result.content, ...(result.ok ? {} : { is_error: true }) });
+        }
+        messages.push({ role: "user", content: results });
+      }
     } catch (err) {
       throw mapError(err);
     }
 
-    try {
-      for await (const event of stream) {
-        if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-          yield { type: "text", text: event.delta.text };
-        }
-      }
-      const final = await stream.finalMessage();
-      if (final.stop_reason === "refusal") {
-        throw new ProviderError("refusal", "The model declined to answer this request.");
-      }
-      yield {
-        type: "done",
-        stopReason: final.stop_reason ?? "unknown",
-        servedBy: final.model,
-        usage: {
-          inputTokens: final.usage.input_tokens,
-          outputTokens: final.usage.output_tokens,
-          cacheReadTokens: final.usage.cache_read_input_tokens ?? 0,
-          cacheWriteTokens: final.usage.cache_creation_input_tokens ?? 0,
-        },
-      };
-    } catch (err) {
-      throw mapError(err);
-    }
+    yield { type: "done", stopReason: final?.stop_reason ?? "unknown", servedBy: final?.model ?? req.model, usage };
+  }
+}
+
+async function runTool(tools: ToolDef[], use: BetaToolUseBlock): Promise<{ ok: boolean; content: string }> {
+  const tool = tools.find((t) => t.name === use.name);
+  if (!tool) return { ok: false, content: `Unknown tool: ${use.name}` };
+  // Eager input streaming means the API doesn't validate inputs; the tool's own run() validates.
+  if (typeof use.input !== "object" || use.input === null || Array.isArray(use.input)) {
+    return { ok: false, content: "INVALID_JSON: tool input must be an object." };
+  }
+  try {
+    return await tool.run(use.input as Record<string, unknown>);
+  } catch (err) {
+    return { ok: false, content: `Tool failed: ${(err as Error).message}` };
   }
 }
 

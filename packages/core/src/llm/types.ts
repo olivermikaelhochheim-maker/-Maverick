@@ -5,6 +5,18 @@ export interface ChatTurn {
   content: string;
 }
 
+/**
+ * A tool the model may call. `run` executes it inside Maverick; the provider
+ * loops (call -> run -> return result) up to `maxToolRounds` times.
+ */
+export interface ToolDef {
+  name: string;
+  description: string;
+  /** JSON Schema with additionalProperties: false and every property required (strict mode). */
+  inputSchema: Record<string, unknown>;
+  run(input: Record<string, unknown>): Promise<{ ok: boolean; content: string }>;
+}
+
 export interface ChatRequest {
   model: string;
   system: string;
@@ -17,10 +29,14 @@ export interface ChatRequest {
   maxOutputTokens: number;
   effort?: "low" | "medium" | "high";
   signal?: AbortSignal;
+  tools?: ToolDef[];
+  /** Max tool-use round trips per request (each is another model call). Default 2. */
+  maxToolRounds?: number;
 }
 
 export type ChatEvent =
   | { type: "text"; text: string }
+  | { type: "tool"; name: string; ok: boolean }
   | { type: "done"; usage: TokenUsage; stopReason: string; servedBy: string };
 
 export type ProviderErrorKind =

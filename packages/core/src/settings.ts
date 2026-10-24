@@ -31,8 +31,25 @@ export interface Settings {
   schedule: {
     /** Local time for the morning briefing, "HH:MM". */
     briefingTime: string;
-    /** No proactive messages between start and end (local time, may span midnight). */
+    /** Local time for the evening check-in, "HH:MM". */
+    checkInTime: string;
+    /** Weekly review: day of week (0 = Sunday) and local time. */
+    weeklyReview: { day: number; time: string };
+    /** No notifications between start and end (local time, may span midnight). */
     quietHours: { start: string; end: string };
+  };
+  /** Proactive behaviour. All of it is opt-in and can be switched off here. */
+  proactive: {
+    morningBriefing: boolean;
+    eveningCheckIn: boolean;
+    weeklyReview: boolean;
+    /** Let Maverick propose memories, tasks, goals and actions from conversations (they wait in the inbox). */
+    suggestFromChat: boolean;
+  };
+  notifications: {
+    /** Consent for push notifications to subscribed devices. */
+    enabled: boolean;
+    maxPerDay: number;
   };
   ui: { reduceMotion: boolean };
 }
@@ -42,6 +59,7 @@ export interface Settings {
  * stated directly, not model guesses, and they can be edited or cleared in Settings.
  */
 export const DEFAULT_ABOUT_ME = `Source: Oliver's brief and answers to Maverick, 24 Oct 2026.
+- Pronouns: he/him. Prefers to be addressed as Oliver.
 - Lives in Norway (Oslo time). Money amounts for Zorza are in NOK unless stated otherwise.
 - Runs Zorza Marketing. 1-year goal: grow revenue (not profit) toward 100,000/month in NOK. Exact target amount and current baseline not yet confirmed.
 - 3-year goal: learn about and begin stock and real-estate investing when financially appropriate.
@@ -64,7 +82,14 @@ export const DEFAULT_SETTINGS: Settings = {
     maxOutputTokens: 4_000,
   },
   budget: { monthlySoftUsd: 30, monthlyHardUsd: 40, dailyHardUsd: 5 },
-  schedule: { briefingTime: "05:30", quietHours: { start: "22:00", end: "05:00" } },
+  schedule: {
+    briefingTime: "05:30",
+    checkInTime: "21:00",
+    weeklyReview: { day: 0, time: "18:00" },
+    quietHours: { start: "22:00", end: "05:00" },
+  },
+  proactive: { morningBriefing: true, eveningCheckIn: true, weeklyReview: true, suggestFromChat: true },
+  notifications: { enabled: false, maxPerDay: 6 },
   ui: { reduceMotion: false },
 };
 
@@ -109,6 +134,14 @@ export function validateSettings(s: Settings): Settings {
   hhmm(s.schedule.briefingTime, "Briefing time");
   hhmm(s.schedule.quietHours.start, "Quiet hours start");
   hhmm(s.schedule.quietHours.end, "Quiet hours end");
+  hhmm(s.schedule.checkInTime, "Check-in time");
+  hhmm(s.schedule.weeklyReview.time, "Weekly review time");
+  if (!Number.isInteger(s.schedule.weeklyReview.day) || s.schedule.weeklyReview.day < 0 || s.schedule.weeklyReview.day > 6) {
+    fail("Weekly review day must be 0 (Sunday) to 6 (Saturday).");
+  }
+  for (const [k, v] of Object.entries(s.proactive)) if (typeof v !== "boolean") fail(`Invalid setting: ${k}.`);
+  if (typeof s.notifications.enabled !== "boolean") fail("Invalid notification setting.");
+  num(s.notifications.maxPerDay, 0, 50, "Notifications per day");
   if (typeof s.ui.reduceMotion !== "boolean") fail("Invalid motion setting.");
   return s;
 }
