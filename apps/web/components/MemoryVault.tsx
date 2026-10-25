@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { Memory, MemoryCategory, Retention } from "@maverick/core";
+import { parseMemoryLines } from "@/lib/memory-lines";
 import { api } from "@/lib/client";
 
 const CATEGORIES: Record<MemoryCategory, string> = {
@@ -29,6 +30,30 @@ export function MemoryVault({ initial }: { initial: Memory[] }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [mode, setMode] = useState<"one" | "many">("one");
+  const [bulk, setBulk] = useState("");
+  const [bulkCat, setBulkCat] = useState<MemoryCategory>("profile");
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkResult, setBulkResult] = useState<{ added: number; skipped: { line: string; reason: string }[] } | null>(null);
+  const bulkLines = useMemo(() => parseMemoryLines(bulk), [bulk]);
+
+  const addMany = async () => {
+    setError(null);
+    setBulkResult(null);
+    setBulkBusy(true);
+    try {
+      const res = await api<{ added: Memory[]; skipped: { line: string; reason: string }[] }>("/api/memories/bulk", {
+        body: { category: bulkCat, text: bulk },
+      });
+      setMemories((ms) => [...res.added.slice().reverse(), ...ms]);
+      setBulkResult({ added: res.added.length, skipped: res.skipped });
+      setBulk("");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -74,22 +99,67 @@ export function MemoryVault({ initial }: { initial: Memory[] }) {
     <div>
       {error && <div className="alert alert-error" role="alert">{error}</div>}
       <section className="card">
-        <h2>Add something Maverick should know</h2>
-        <form onSubmit={add}>
-          <div className="inline-form">
-            <label htmlFor="m-content" className="sr-only">Memory</label>
-            <input id="m-content" name="content" required maxLength={2000} placeholder="e.g. I do my best work before 11:00" />
-            <button className="btn btn-primary">Add</button>
+        <div className="row" style={{ justifyContent: "space-between", marginBottom: "0.6rem" }}>
+          <h2 style={{ margin: 0 }}>Add something Maverick should know</h2>
+          <div className="segmented" role="tablist" aria-label="How to add">
+            <button role="tab" aria-selected={mode === "one"} className={mode === "one" ? "on" : ""} onClick={() => setMode("one")}>One at a time</button>
+            <button role="tab" aria-selected={mode === "many"} className={mode === "many" ? "on" : ""} onClick={() => setMode("many")}>Paste many</button>
           </div>
-          <div style={{ marginTop: "0.5rem", maxWidth: 260 }}>
-            <label htmlFor="m-cat">Category</label>
-            <select id="m-cat" name="category" defaultValue="profile">
-              {Object.entries(CATEGORIES).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))}
-            </select>
+        </div>
+        {mode === "one" ? (
+          <form onSubmit={add}>
+            <div className="inline-form">
+              <label htmlFor="m-content" className="sr-only">Memory</label>
+              <input id="m-content" name="content" required maxLength={2000} placeholder="e.g. I do my best work before 11:00" />
+              <button className="btn btn-primary">Add</button>
+            </div>
+            <div style={{ marginTop: "0.5rem", maxWidth: 260 }}>
+              <label htmlFor="m-cat">Category</label>
+              <select id="m-cat" name="category" defaultValue="profile">
+                {Object.entries(CATEGORIES).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+            </div>
+          </form>
+        ) : (
+          <div>
+            <label htmlFor="m-bulk">Paste memories, one per line</label>
+            <textarea
+              id="m-bulk"
+              rows={8}
+              value={bulk}
+              onChange={(e) => {
+                setBulk(e.target.value);
+                setBulkResult(null);
+              }}
+              placeholder={"Oliver lives in Stavanger, Norway.\nOliver speaks Polish, Norwegian, German and English.\nOliver has two dogs, Luna and Grace."}
+            />
+            <p className="hint">Bullets, numbering, blank lines and ``` lines are ignored. Duplicates of existing memories are skipped. Up to 100 lines at a time.</p>
+            <div className="row" style={{ marginTop: "0.5rem", alignItems: "flex-end" }}>
+              <div style={{ minWidth: 200 }}>
+                <label htmlFor="m-bulk-cat">Category for all of these</label>
+                <select id="m-bulk-cat" value={bulkCat} onChange={(e) => setBulkCat(e.target.value as MemoryCategory)}>
+                  {Object.entries(CATEGORIES).map(([k, v]) => (
+                    <option key={k} value={k}>{v}</option>
+                  ))}
+                </select>
+              </div>
+              <button className="btn btn-primary" disabled={bulkBusy || bulkLines.length === 0 || bulkLines.length > 100} onClick={addMany}>
+                {bulkBusy ? "Adding…" : `Add ${bulkLines.length || ""} ${bulkLines.length === 1 ? "memory" : "memories"}`}
+              </button>
+            </div>
+            {bulkLines.length > 100 && <p className="small" style={{ color: "var(--danger)" }}>That&apos;s {bulkLines.length} lines; paste at most 100 at a time.</p>}
+            {bulkResult && (
+              <div className="alert alert-ok" role="status" style={{ marginTop: "0.8rem", marginBottom: 0 }}>
+                Added {bulkResult.added} {bulkResult.added === 1 ? "memory" : "memories"}.
+                {bulkResult.skipped.length > 0 && (
+                  <> Skipped {bulkResult.skipped.length} already in the vault: {bulkResult.skipped.map((x) => `"${x.line}"`).join(", ")}.</>
+                )}
+              </div>
+            )}
           </div>
-        </form>
+        )}
       </section>
 
       <section className="card">

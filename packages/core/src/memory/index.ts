@@ -34,6 +34,23 @@ export const DEFAULT_RETENTION: Record<MemoryCategory, Retention> = {
 
 const RETENTION_DAYS: Record<Retention, number | null> = { permanent: null, "1y": 365, "90d": 90, "30d": 30, "7d": 7 };
 
+/** Most lines accepted in one paste. */
+export const MAX_BULK = 100;
+
+/** Split pasted text into memory lines, dropping bullets, numbering, blanks, headings and code fences. */
+export function parseMemoryLines(text: string): string[] {
+  return text
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith("```") && !/^#{1,6}\s/.test(l))
+    .map((l) => l.replace(/^(?:[-*•–]\s+|\d{1,3}[.)]\s+)/, "").trim())
+    .map((l) => l.replace(/^["“](.*)["”]$/, "$1").trim())
+    .filter(Boolean);
+}
+
+const normalise = (s: string) => s.toLowerCase().replace(/\s+/g, " ").replace(/[.!]+$/, "").trim();
+
 /** Categories that describe who Oliver is: always given to the model. */
 const ALWAYS_INCLUDE: MemoryCategory[] = ["profile", "preference", "goal"];
 
@@ -144,6 +161,59 @@ export class MemoryStore {
     );
     await audit(this.db, { userId, actor: input.source === "user" ? "user" : "system", action: "memory.created", target: id, details: { category: input.category, source: input.source } });
     return (await this.get(userId, id))!;
+  }
+
+  /**
+   * Add many memories at once from pasted text: one memory per line.
+   * Bullets and numbering are stripped; blank lines, code-fence lines and
+   * headings are ignored; duplicates (of each other or of existing memories) are skipped.
+   * All-or-nothing: if any line is invalid, nothing is saved.
+   */
+  async createMany(
+    userId: string,
+    input: { category: MemoryCategory; text: string; retention?: Retention },
+  ): Promise<{ added: Memory[]; skipped: { line: string; reason: string }[] }> {
+    validate({ category: input.category, retention: input.retention });
+    const lines = parseMemoryLines(input.text);
+    if (!lines.length) throw new UserFacingError("Nothing to add: paste one memory per line.", "bad_memory");
+    if (lines.length > MAX_BULK) throw new UserFacingError(`Paste at most ${MAX_BULK} lines at a time.`, "bad_memory");
+    for (const [i, line] of lines.entries()) {
+      if (line.length > 2000) throw new UserFacingError(`Line ${i + 1} is too long (max 2,000 characters).`, "bad_memory");
+    }
+
+    const seen = new Set((await this.list(userId)).map((m) => normalise(m.content)));
+    const skipped: { line: string; reason: string }[] = [];
+    const toAdd: string[] = [];
+    for (const line of lines) {
+      const key = normalise(line);
+      if (seen.has(key)) {
+        skipped.push({ line, reason: "Already in the vault" });
+        continue;
+      }
+      seen.add(key);
+      toAdd.push(line);
+    }
+
+    const retention = input.retention ?? DEFAULT_RETENTION[input.category];
+    const ids = await this.db.transaction(async (tx) => {
+      const out: string[] = [];
+      for (const content of toAdd) {
+        const id = randomUUID();
+        await tx.query(
+          `INSERT INTO memories (id, user_id, category, content_enc, source, confidence, retention, expires_at, created_at)
+           VALUES ($1,$2,$3,$4,'user',1,$5,$6, clock_timestamp())`,
+          [id, userId, input.category, this.cipher.encrypt(content), retention, expiry(retention)],
+        );
+        out.push(id);
+      }
+      if (out.length) {
+        await audit(tx, { userId, actor: "user", action: "memory.bulk_created", details: { category: input.category, count: out.length } });
+      }
+      return out;
+    });
+    const added: Memory[] = [];
+    for (const id of ids) added.push((await this.get(userId, id))!);
+    return { added, skipped };
   }
 
   async get(userId: string, id: string): Promise<Memory | null> {

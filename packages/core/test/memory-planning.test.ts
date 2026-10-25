@@ -158,3 +158,62 @@ describe("suggestion inbox", () => {
     }
   });
 });
+
+describe("paste many memories at once", () => {
+  it("cleans lines, skips blanks/fences/headings and duplicates, saves the rest in one go", async () => {
+    const { db, user, memory } = await stores();
+    await memory.create(user.id, { category: "profile", content: "Oliver lives in Stavanger, Norway.", source: "user" });
+    const text = [
+      "```",
+      "## Profile facts",
+      "Oliver lives in Stavanger, Norway",
+      "- Oliver speaks Polish, Norwegian, German and English.",
+      "",
+      "2. Oliver has two dogs, Luna and Grace.",
+      "• oliver has two dogs, luna and grace.",
+      '"Oliver works at Widerøe."',
+      "```",
+    ].join("\r\n");
+    const res = await memory.createMany(user.id, { category: "profile", text });
+    expect(res.added.map((m) => m.content)).toEqual([
+      "Oliver speaks Polish, Norwegian, German and English.",
+      "Oliver has two dogs, Luna and Grace.",
+      "Oliver works at Widerøe.",
+    ]);
+    expect(res.added.every((m) => m.source === "user" && m.confidence === 1 && m.category === "profile")).toBe(true);
+    expect(res.skipped.map((s) => s.reason)).toEqual(["Already in the vault", "Already in the vault"]);
+    expect(await memory.list(user.id)).toHaveLength(4);
+    const audits = await db.query<{ action: string }>("SELECT action FROM audit_log WHERE action = 'memory.bulk_created'");
+    expect(audits.rows).toHaveLength(1);
+  });
+
+  it("uses the category's default retention unless one is given", async () => {
+    const { user, memory } = await stores();
+    const a = await memory.createMany(user.id, { category: "ephemeral", text: "Travelling to Bergen this week" });
+    expect(a.added[0]).toMatchObject({ retention: "7d" });
+    const b = await memory.createMany(user.id, { category: "project", text: "Statistics exam on 20 November", retention: "permanent" });
+    expect(b.added[0]).toMatchObject({ retention: "permanent", expiresAt: null });
+  });
+
+  it("is all-or-nothing on invalid input", async () => {
+    const { user, memory } = await stores();
+    await expect(memory.createMany(user.id, { category: "profile", text: "ok line\n" + "x".repeat(2001) })).rejects.toThrow(/Line 2 is too long/);
+    await expect(memory.createMany(user.id, { category: "profile", text: "\n\n```\n" })).rejects.toThrow(/Nothing to add/);
+    await expect(memory.createMany(user.id, { category: "profile", text: Array.from({ length: 101 }, (_, i) => `fact ${i}`).join("\n") })).rejects.toThrow(/at most 100/);
+    await expect(memory.createMany(user.id, { category: "nonsense" as never, text: "a" })).rejects.toThrow(/category/);
+    expect(await memory.list(user.id)).toHaveLength(0);
+  });
+});
+
+describe("browser preview parser", () => {
+  it("matches the server's line parser exactly", async () => {
+    const { parseMemoryLines: server } = await import("../src/memory");
+    const { parseMemoryLines: browser } = await import("../../../apps/web/lib/memory-lines");
+    const samples = [
+      "```\n## Heading\n- a\n* b\n• c\n– d\n1. e\n12) f\n\n\"g\"\n“h”\n```",
+      "plain\r\nwindows\r\n",
+      "   indented   \n#not a heading\n# real heading",
+    ];
+    for (const s of samples) expect(browser(s)).toEqual(server(s));
+  });
+});

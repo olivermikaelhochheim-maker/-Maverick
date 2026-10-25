@@ -183,6 +183,24 @@ test.describe.serial("Maverick", () => {
     await expect(page.getByText("Trains at 18:00 on weekdays")).toHaveCount(0);
   });
 
+  test("Memory Vault: paste many at once", async ({ page }) => {
+    await ensureAccount(page);
+    await page.goto("/memory");
+    await page.getByRole("tab", { name: "Paste many" }).click();
+    const tag = test.info().project.name;
+    await page.getByLabel("Paste memories, one per line").fill(
+      ["```", `- Oliver's sister is Veronika (${tag}).`, `Oliver has two dogs, Luna and Grace (${tag}).`, "", `1. Oliver speaks Polish (${tag}).`, "```"].join("\n"),
+    );
+    await page.getByLabel("Category for all of these").selectOption("profile");
+    await page.getByRole("button", { name: "Add 3 memories" }).click();
+    await expect(page.locator("[role=status]")).toContainText("Added 3 memories");
+    await expect(page.locator(".mem-item", { hasText: `Oliver speaks Polish (${tag}).` })).toContainText("Added by you");
+    // Pasting the same again skips them.
+    await page.getByLabel("Paste memories, one per line").fill(`Oliver speaks Polish (${tag}).`);
+    await page.getByRole("button", { name: "Add 1 memory" }).click();
+    await expect(page.locator("[role=status]")).toContainText("Skipped 1 already in the vault");
+  });
+
   test("goals and tasks: add, link, complete", async ({ page }) => {
     await ensureAccount(page);
     const tag = test.info().project.name;

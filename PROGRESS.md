@@ -26,14 +26,15 @@ Single-user auth, streaming chat, model routing (Haiku/Sonnet/Opus 5.5), hard bu
 - **Notifications**: Web Push to iPhone/Mac with explicit consent, per-device opt-in, quiet hours 22:00–05:00 (reminders held until they end), daily cap, test button.
 - **Google Calendar (read-only)**: OAuth with PKCE, read-only scope verified, tokens encrypted, automatic refresh, "needs reconnecting" state, disconnect revokes at Google. Agenda on the Command Center and in briefings and chat context. Demo calendar for testing.
 - **Data export**: everything, decrypted, as JSON.
+- **Paste many at once** (Memory Vault): one memory per line, bullets/numbering/code fences stripped, duplicates skipped, all-or-nothing, up to 100 lines.
 - Oliver's answers applied: Oslo time zone, NOK revenue goal, Google tools, he/him, daily rhythm.
 
 ## Test results (2026-10-24, Linux cloud container)
 | Suite | Result |
 |---|---|
 | TypeScript typecheck (core + web) | ✅ pass |
-| Core unit + integration (Vitest, real embedded Postgres) | ✅ 95 / 95 |
-| Browser end-to-end (Playwright, production build; iPhone 15 + desktop) | ✅ 33 passed, 1 skipped by design |
+| Core unit + integration (Vitest, real embedded Postgres) | ✅ 99 / 99 |
+| Browser end-to-end (Playwright, production build; iPhone 15 + desktop) | ✅ 35 passed, 1 skipped by design |
 
 New coverage: Oslo DST time maths and quiet hours across midnight; memory provenance, expiry, selection reasons and token cap; task ranking and reminders; accept/edit/dismiss semantics; proposal tool validation and limits; strict-schema compatibility; chat context (memories, goals, tasks, calendar) and tool events; Google token refresh, unselected calendars, declined events, revoked tokens, missing-scope refusal; push consent, quiet hours, daily cap, dead subscriptions, endpoint allowlist; briefing template vs. model, budget fallback, once-per-day scheduling, catch-up, opt-out; export.
 
@@ -47,7 +48,7 @@ Bugs found by tests and fixed this milestone: suggestion chips vanished on reloa
 - macOS Keychain storage; a physical iPhone.
 
 ## Open questions for Oliver
-1. Zorza target: **100,000 NOK/month**, or the NOK equivalent of $100,000 (about 1 million NOK)? Current monthly revenue, client count, average deal size.
+1. ~~Zorza target~~ Answered: 100,000 NOK/month of self-created income by end of 2027; Zorza is still an idea. Pilot training (integrated) to finish ~Oct 2029.
 2. Mac model and macOS version (Apple menu → About This Mac).
 3. Which personal or financial data must stay only on the Mac vs. allowed in encrypted cloud storage (matters for the cloud move).
 
@@ -71,4 +72,4 @@ Typical ~$10 (chat ~$8 + briefings ~$1.20 + extra context ~$0.60); light ~$3; he
 
 **5. Zorza CEO Advisor:** KPI definitions, client pipeline (Maverick as the light CRM Oliver doesn't have yet), revenue decomposition from real NOK baselines, weekly CEO review.
 
-Small follow-ups: budget periods in Oslo time instead of UTC; edit task titles inline; snooze for reminders.
+Small follow-ups: shift-aware briefing time (an hour before the first calendar event); yearly repeating reminders (birthdays); learning from feedback (👍/👎 + "Teach Maverick"); budget periods in Oslo time; snooze for reminders.
