@@ -183,6 +183,88 @@ test.describe.serial("Maverick", () => {
     await expect(page.getByText("Trains at 18:00 on weekdays")).toHaveCount(0);
   });
 
+  test("voice: off by default, then push-to-talk sends a spoken message and the reply is read aloud", async ({ page }) => {
+    // Fake speech engines: the test browser has no microphone or speakers.
+    const heard = `Remember that I fly on Sundays (${test.info().project.name})`;
+    await page.addInitScript((heardText: string) => {
+      const w = window as unknown as Record<string, unknown>;
+      w.__spoken = [] as string[];
+      w.__heard = heardText;
+      class FakeUtterance {
+        text: string;
+        onstart?: () => void;
+        onend?: () => void;
+        voice: unknown;
+        lang = "";
+        rate = 1;
+        pitch = 1;
+        volume = 1;
+        constructor(t: string) {
+          this.text = t;
+        }
+      }
+      Object.defineProperty(window, "SpeechSynthesisUtterance", { value: FakeUtterance, configurable: true });
+      Object.defineProperty(window, "speechSynthesis", {
+        configurable: true,
+        value: {
+          speak(u: FakeUtterance) {
+            if (u.text.trim()) (w.__spoken as string[]).push(u.text);
+            setTimeout(() => {
+              u.onstart?.();
+              u.onend?.();
+            }, 5);
+          },
+          cancel() {},
+          getVoices: () => [{ name: "Daniel", lang: "en-GB", voiceURI: "daniel" }],
+          addEventListener() {},
+        },
+      });
+      class FakeRecognition {
+        lang = "";
+        interimResults = false;
+        continuous = false;
+        maxAlternatives = 1;
+        onresult: ((e: unknown) => void) | null = null;
+        onend: (() => void) | null = null;
+        onerror: ((e: unknown) => void) | null = null;
+        onstart: (() => void) | null = null;
+        start() {
+          (w as Record<string, unknown>).__recLang = this.lang;
+          setTimeout(() => this.onresult?.({ resultIndex: 0, results: [{ isFinal: false, 0: { transcript: "Remember that" } }] }), 100);
+          setTimeout(() => {
+            this.onresult?.({ resultIndex: 0, results: [{ isFinal: true, 0: { transcript: w.__heard as string } }] });
+            this.onend?.();
+          }, 1500);
+        }
+        stop() {}
+        abort() {
+          this.onend?.();
+        }
+      }
+      Object.defineProperty(window, "SpeechRecognition", { value: FakeRecognition, configurable: true });
+      Object.defineProperty(window, "webkitSpeechRecognition", { value: FakeRecognition, configurable: true });
+    }, heard);
+    await ensureAccount(page);
+    await page.goto("/chat");
+    await expect(page.getByLabel("Talk to Maverick")).toHaveCount(0); // opt-in: no mic until enabled
+
+    await page.goto("/settings");
+    await page.getByLabel("Use voice on this device").check();
+    await expect(page.getByLabel("Maverick's voice")).toContainText("Daniel (en-GB) – recommended");
+    await page.goto("/chat");
+    await page.getByLabel("Talk to Maverick").click();
+    await expect(page.getByText("Listening… tap the mic")).toBeVisible();
+    await expect(page.getByLabel("Message Maverick")).toHaveValue(/Remember that/);
+    // Auto-sent when speech ends; Maverick replies and speaks.
+    await expect(page.locator(".msg-user").last()).toHaveText(heard, { timeout: 10_000 });
+    await expect(page.locator(".sugg-chip").last()).toContainText("I fly on Sundays", { timeout: 20_000 });
+    await expect(page.locator(".msg-meta").last()).toContainText("spoke after");
+    const spoken = (await page.evaluate(() => (window as unknown as { __spoken: string[] }).__spoken)).join(" ");
+    expect(spoken).toContain("I've suggested that.");
+    expect(spoken).not.toMatch(/[_*#`]/); // markdown stripped before speaking
+    expect(await page.evaluate(() => (window as unknown as { __recLang: string }).__recLang)).toBe("en-GB");
+  });
+
   test("Memory Vault: paste many at once", async ({ page }) => {
     await ensureAccount(page);
     await page.goto("/memory");
@@ -270,6 +352,8 @@ test.describe.serial("Maverick", () => {
     const h = res.headers();
     expect(h["content-security-policy"]).toContain("frame-ancestors 'none'");
     expect(h["x-frame-options"]).toBe("DENY");
-    expect(h["permissions-policy"]).toContain("microphone=()");
+    // Microphone allowed only for Maverick itself (push-to-talk); never for embedded third parties.
+    expect(h["permissions-policy"]).toContain("microphone=(self)");
+    expect(h["permissions-policy"]).toContain("camera=()");
   });
 });

@@ -5,7 +5,7 @@
  */
 import { useId } from "react";
 
-export function Orb({ size = 64, state = "idle", label }: { size?: number; state?: "idle" | "thinking" | "speaking"; label?: string }) {
+export function Orb({ size = 64, state = "idle", label }: { size?: number; state?: "idle" | "thinking" | "speaking" | "listening"; label?: string }) {
   // Unique per instance: a shared id breaks when the first copy sits in a hidden element.
   const gradientId = `orb-core-${useId().replace(/:/g, "")}`;
   return (

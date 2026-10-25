@@ -79,6 +79,15 @@ describe("chat as chief of staff", () => {
     expect(await w.deps.memory.contextFor(w.user.id, done.assistantMessageId)).toEqual([expect.objectContaining({ id: m.id })]);
   });
 
+  it("asks for a spoken style only when Oliver used his voice", async () => {
+    const p = new ToolUsingProvider();
+    const w = await world(p);
+    await collect(w.chat.send({ user: w.user, text: "typed question" }));
+    await collect(w.chat.send({ user: w.user, text: "spoken question", voice: true }));
+    expect(p.requests[0]!.turnContext).not.toContain("by voice");
+    expect(p.requests[1]!.turnContext).toContain("talking to you by voice");
+  });
+
   it("can switch proposals off", async () => {
     const p = new ToolUsingProvider();
     const w = await world(new MockProvider({ delayMs: 0 }));

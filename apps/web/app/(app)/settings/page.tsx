@@ -3,6 +3,7 @@ import { getSettings } from "@maverick/core";
 import { LogoutButton } from "@/components/AuthForms";
 import { CalendarPanel } from "@/components/CalendarPanel";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
+import { VoicePanel } from "@/components/VoicePanel";
 import { PasswordForm, SettingsForm } from "@/components/SettingsForm";
 import { getMaverick, requireUser } from "@/lib/server";
 
@@ -44,6 +45,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <NotificationsPanel serverConfigured={m.notifier.configured} consent={settings.notifications.enabled} />
         </section>
       </div>
+      <section className="card" id="voice" aria-labelledby="h-voice" style={{ marginBottom: "1rem" }}>
+        <h2 id="h-voice">Voice on this device</h2>
+        <VoicePanel />
+      </section>
       <SettingsForm initial={settings} />
       <section className="card" style={{ marginTop: "1.5rem" }}>
         <h2>Your data</h2>
@@ -54,10 +59,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <h2>Password</h2>
         <PasswordForm />
       </section>
-      <section className="card">
-        <h2>Voice</h2>
-        <p className="empty">Not available yet. Push-to-talk with a licensed British voice is the next milestone, after you pick a voice from samples.</p>
-      </section>
+
     </div>
   );
 }

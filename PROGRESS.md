@@ -1,6 +1,6 @@
 # Maverick: progress log
 
-## Status: Milestone 2 (Chief of Staff core) built and tested in mock mode. Awaiting Oliver's live test and approval of the next milestone.
+## Status: Milestone 3a (voice, built-in engines) built and tested with simulated speech. Next: Oliver tries it on Mac/iPhone, then picks a premium voice.
 
 Last updated: 2026-10-24 · Code: https://github.com/olivermikaelhochheim-maker/-Maverick
 
@@ -29,12 +29,21 @@ Single-user auth, streaming chat, model routing (Haiku/Sonnet/Opus 5.5), hard bu
 - **Paste many at once** (Memory Vault): one memory per line, bullets/numbering/code fences stripped, duplicates skipped, all-or-nothing, up to 100 lines.
 - Oliver's answers applied: Oslo time zone, NOK revenue goal, Google tools, he/him, daily rhythm.
 
+### Milestone 3a: Voice (built-in, free)
+- Push-to-talk mic in Conversation, with a visible red "Listening…" bar, Cancel/Esc, and auto-send when you stop talking (optional)
+- Replies read aloud sentence by sentence as they stream, in a British male voice (Apple Daniel/Arthur, Chrome UK Male); Markdown, links and emoji removed before speaking
+- Barge-in: tapping the mic, sending or Stop silences Maverick immediately
+- Spoken-style replies (short, no lists) when you talk instead of type
+- Latency shown per spoken reply ("spoke after 1.8s")
+- Settings → Voice on this device: voice picker with preview, speed, pitch, when to speak, language (EN/NO/PL/DE), privacy notes, how to install Enhanced voices
+- ADR 0011; microphone allowed for Maverick's own pages only
+
 ## Test results (2026-10-24, Linux cloud container)
 | Suite | Result |
 |---|---|
 | TypeScript typecheck (core + web) | ✅ pass |
-| Core unit + integration (Vitest, real embedded Postgres) | ✅ 99 / 99 |
-| Browser end-to-end (Playwright, production build; iPhone 15 + desktop) | ✅ 35 passed, 1 skipped by design |
+| Core unit + integration (Vitest, real embedded Postgres) | ✅ 105 / 105 |
+| Browser end-to-end (Playwright, production build; iPhone 15 + desktop) | ✅ 37 passed, 1 skipped by design |
 
 New coverage: Oslo DST time maths and quiet hours across midnight; memory provenance, expiry, selection reasons and token cap; task ranking and reminders; accept/edit/dismiss semantics; proposal tool validation and limits; strict-schema compatibility; chat context (memories, goals, tasks, calendar) and tool events; Google token refresh, unselected calendars, declined events, revoked tokens, missing-scope refusal; push consent, quiet hours, daily cap, dead subscriptions, endpoint allowlist; briefing template vs. model, budget fallback, once-per-day scheduling, catch-up, opt-out; export.
 
@@ -46,6 +55,7 @@ Bugs found by tests and fixed this milestone: suggestion chips vanished on reloa
 - **Real push delivery to an iPhone** (tested with a simulated push service).
 - **`tailscale serve`**: whether it passes the original host header through. `MAVERICK_ALLOWED_ORIGINS` covers the case where it doesn't.
 - macOS Keychain storage; a physical iPhone.
+- **Voice on real devices** (tested with simulated microphone and speakers): iOS Safari speech recognition reliability, and which Enhanced/Premium British voices each device offers.
 
 ## Open questions for Oliver
 1. ~~Zorza target~~ Answered: 100,000 NOK/month of self-created income by end of 2027; Zorza is still an idea. Pilot training (integrated) to finish ~Oct 2029.
@@ -66,7 +76,7 @@ pnpm test:e2e              # browser tests (after pnpm build)
 Typical ~$10 (chat ~$8 + briefings ~$1.20 + extra context ~$0.60); light ~$3; heavy capped at $40. Hosting $0 (Mac), Google API $0, push $0. Details: `docs/budget.md`.
 
 ## Next milestones (proposed)
-**3. Voice:** push-to-talk with a visible microphone state, streaming speech-to-text → Claude → licensed British male voice, interruptible, text fallback, latency measured. Starts with 3–4 voice samples and real vendor prices for Oliver to choose from.
+**3b. Premium voice:** a natural neural British voice through one vendor (Azure / OpenAI / ElevenLabs; ~$4–12/month typical), chosen after Oliver hears samples. Then an opt-in local "Hey Maverick" wake word on the Mac.
 
 **4. Gmail + calendar writes (with confirmation):** read and summarise email, draft replies; every send or calendar change waits in an approval queue. Plus a cloud move (always-on briefings without the Mac) and passkeys before any public exposure.
 

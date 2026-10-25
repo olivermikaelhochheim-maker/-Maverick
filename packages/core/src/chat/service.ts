@@ -21,6 +21,10 @@ import { ConversationStore, windowHistory } from "./conversations";
 import { buildSystemPrompt, buildTurnContext } from "./persona";
 
 export const MAX_USER_MESSAGE_CHARS = 20_000;
+
+/** Added when Oliver speaks: the reply will be read aloud, so it should sound like speech. */
+export const VOICE_STYLE =
+  "Oliver is talking to you by voice and your reply will be spoken aloud. Answer like a composed person speaking: short sentences, usually under 80 words, no lists, headings, tables, links or emoji. Offer more detail only if he asks.";
 /** Tool round trips allowed per reply (each is another model call). */
 export const MAX_TOOL_ROUNDS = 2;
 
@@ -111,6 +115,8 @@ export class ChatService {
     conversationId?: string;
     text: string;
     deep?: boolean;
+    /** Oliver spoke this message; the reply will be read aloud. */
+    voice?: boolean;
     signal?: AbortSignal;
   }): AsyncGenerator<ChatStreamEvent> {
     const text = input.text.trim();
@@ -151,7 +157,13 @@ export class ChatService {
         `Month-to-date spend ($${spendBefore.monthUsd.toFixed(2)}) is past your soft limit ($${spendBefore.monthSoftUsd.toFixed(2)}). Using the fast model.`,
       );
     }
-    const turnContext = `${buildTurnContext(user.displayName, formatLocalNow(settings.timezone))}\n\n${contextText}`;
+    const turnContext = [
+      buildTurnContext(user.displayName, formatLocalNow(settings.timezone)),
+      input.voice ? VOICE_STYLE : "",
+      contextText,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
     const turns = windowHistory([...history, { role: "user" as const, content: text }], settings.routing.historyTokenBudget, estimateTokens);
     if (turns[0]?.role === "assistant") turns.unshift({ role: "user", content: SYSTEM_OPENED_TURN });
     const estInput = estimateTokens(system) + estimateTokens(turnContext) + turns.reduce((n, t) => n + estimateTokens(t.content), 0) + 900; // + tool schemas

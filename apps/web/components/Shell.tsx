@@ -18,7 +18,6 @@ const NAV = [
 
 // Shown so the roadmap is visible, but clearly not available yet.
 const LOCKED = [
-  { label: "Voice", phase: 2 },
   { label: "Zorza CEO", phase: 5 },
 ];
 

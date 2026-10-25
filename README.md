@@ -12,7 +12,9 @@ A private AI chief of staff and strategic advisor for Oliver. It runs on your Ma
 - **Push notifications** on iPhone and Mac, never during quiet hours (22:00–05:00).
 - Encryption at rest, an audit log of every action, device management.
 
-**What it can't do (yet):** voice, sending email or messages, changing your calendar, buying, booking, posting, moving money. Maverick knows this and won't claim otherwise. The plan is in `PROGRESS.md`.
+- **Voice**: tap the mic and talk; Maverick answers out loud in a British voice (built into your Mac/iPhone, free).
+
+**What it can't do (yet):** a premium voice, a "Hey Maverick" wake word, sending email or messages, changing your calendar, buying, booking, posting, moving money. Maverick knows this and won't claim otherwise. The plan is in `PROGRESS.md`.
 
 ---
 
@@ -99,6 +101,22 @@ Open <http://localhost:3000>, enter the setup code from step 3, your email, and 
 **Turn on notifications (iPhone):** open Maverick **from the home-screen icon** (iOS only allows notifications for home-screen apps). Then go to More → Settings, tap **Enable on this device**, and allow. In "Daily rhythm & proactivity", tick **Allow push notifications** and save. Tap **Send a test** to check.
 
 Don't set up port forwarding on your router. Maverick should never be reachable from the public internet.
+
+---
+
+## Talk to Maverick (voice)
+
+1. **Settings → Voice on this device → tick "Use voice on this device".** Do this on each device you want to talk on; voice settings are per device.
+2. Pick **Maverick's voice**. A British male voice is preselected. Tap **▶ Preview voice**.
+3. **For a much better voice (free, 2 minutes):**
+   - **Mac:** System Settings → Accessibility → Spoken Content → System voice → **Manage Voices…** → English (United Kingdom) → download **Daniel (Enhanced)** or **Arthur (Premium)** if listed.
+   - **iPhone:** Settings → Accessibility → Spoken Content → Voices → English → English (UK) → download **Daniel (Enhanced)** or **Arthur (Enhanced)**.
+
+   Then reload Maverick and pick that voice.
+4. In **Conversation**, tap the **🎙 mic** and talk. A red **Listening…** bar shows while the microphone is on. Tap the mic again (or just pause) and your message sends; Maverick answers out loud.
+5. Tap the mic or **Stop speaking** to interrupt him; **Esc** cancels.
+
+The first time, the browser asks for microphone permission. Allow it. Use **Safari** (Mac/iPhone) or **Chrome**; Firefox can't transcribe speech. Your speech is transcribed by Apple (Safari) or Google (Chrome); only the text reaches Maverick.
 
 ---
 

@@ -20,4 +20,4 @@ Assets: Oliver's conversations, memories, goals and tasks, personal notes, Googl
 | Notification spam or night-time pings | Consent toggle, per-device opt-in, quiet hours enforced server-side, daily cap | – |
 | Data sent to a third party | Only Anthropic receives conversation text, only when a key is configured; "About me" disclosure in Settings | Anthropic's data-retention terms apply; review before sharing sensitive financial data |
 | Local process snooping | Single-user Mac assumption | `pnpm configure` briefly passes secrets as a command-line argument to `security` |
-| Microphone/camera misuse | `Permissions-Policy` disables microphone and camera entirely | Phase 2 enables the microphone only with a visible, opt-in push-to-talk |
+| Microphone misuse / covert listening | Voice is off until enabled per device; push-to-talk only (no wake word, no background listening); a red "Listening…" bar is visible whenever the mic is on; Cancel/Esc stops it; `Permissions-Policy: microphone=(self)` blocks any embedded third party; camera disabled | Speech-to-text runs at Apple (Safari) or Google (Chrome): their privacy terms apply to what you say |

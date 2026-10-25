@@ -29,6 +29,9 @@ The default hard cap ($40) stops the heavy case from passing $40 in model costs.
 
 Typical total moves from ~$7.50 to **~$10/month**. Briefings fall back to a free template once the soft limit ($30) is reached. Web Push and Google Calendar API: $0.
 
+## Voice (milestone 3, built-in engines)
+$0. Speech-to-text by the browser (Apple/Google), speech by the device's own voices. Voice replies are shorter, so they cost slightly *less* in model tokens than typed ones.
+
 ## Later phases (planning ranges, *unverified*)
 
 | Item | Phase | Rough monthly |

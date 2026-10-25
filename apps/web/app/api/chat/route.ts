@@ -10,7 +10,7 @@ export async function POST(req: Request) {
   let body;
   try {
     ctx = await apiUser(req);
-    body = await readJson<{ text?: unknown; conversationId?: unknown; deep?: unknown }>(req, 100_000);
+    body = await readJson<{ text?: unknown; conversationId?: unknown; deep?: unknown; voice?: unknown }>(req, 100_000);
     if (typeof body.text !== "string") throw new UserFacingError("Message text is required.", "bad_request");
     if (body.conversationId !== undefined && typeof body.conversationId !== "string") {
       throw new UserFacingError("Invalid conversation.", "bad_request");
@@ -27,6 +27,7 @@ export async function POST(req: Request) {
     text: body.text as string,
     conversationId: (body.conversationId as string | undefined) || undefined,
     deep: body.deep === true,
+    voice: body.voice === true,
     signal: abort.signal,
   });
 

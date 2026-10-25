@@ -6,6 +6,7 @@ import { api, usd } from "@/lib/client";
 import { Icon } from "./Icons";
 import { Markdown } from "./Markdown";
 import { Orb } from "./Orb";
+import { Listener, Speaker, canListen, loadPrefs, resolveVoice, unlockSpeech, type VoicePrefs } from "@/lib/voice";
 
 export interface UiMessage {
   id: string;
@@ -18,6 +19,8 @@ export interface UiMessage {
   latencyMs?: number | null;
   firstTokenMs?: number;
   suggestions?: { id: string; kind: string; title: string; decided?: "accepted" | "dismissed" }[];
+  /** Spoken replies: time from Oliver finishing speaking (or sending) to Maverick's first spoken word. */
+  voiceLatencyMs?: number;
   context?: { id: string; category: string; content: string; reason: string }[];
 }
 
@@ -77,6 +80,31 @@ export function ChatView(props: {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const sentInitial = useRef(false);
 
+  // ----- Voice (per device, opt-in in Settings) -----
+  const [prefs, setPrefs] = useState<VoicePrefs | null>(null);
+  const [listening, setListening] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const speakerRef = useRef<Speaker | null>(null);
+  const listenerRef = useRef<Listener | null>(null);
+  const voiceRef = useRef<SpeechSynthesisVoice | undefined>(undefined);
+  useEffect(() => {
+    const p = loadPrefs();
+    setPrefs(p);
+    if (p.enabled) void resolveVoice(p).then((v) => (voiceRef.current = v));
+    return () => {
+      speakerRef.current?.cancel();
+      listenerRef.current?.cancel();
+    };
+  }, []);
+  const micAvailable = Boolean(prefs?.enabled) && canListen();
+
+  const stopSpeaking = () => {
+    speakerRef.current?.cancel();
+    speakerRef.current = null;
+    setSpeaking(false);
+  };
+
   const title = conversations.find((c) => c.id === conversationId)?.title ?? "New conversation";
 
   // Keep the newest message in view while streaming, unless Oliver has scrolled up.
@@ -100,25 +128,48 @@ export function ChatView(props: {
     setMessages((ms) => ms.map((m) => (m.id === id ? { ...m, ...(typeof patch === "function" ? patch(m) : patch) } : m)));
 
   const send = useCallback(
-    async (raw: string) => {
+    async (raw: string, opts: { voice?: boolean; spokenAt?: number } = {}) => {
       const text = raw.trim();
       if (!text || busy) return;
       setInput("");
       setWarnings([]);
+      setVoiceError(null);
       setBusy(true);
+      // A new message interrupts anything Maverick is still saying.
+      speakerRef.current?.cancel();
+      const speakIt = Boolean(prefs?.enabled) && (prefs!.speak === "always" || (prefs!.speak === "voice" && opts.voice));
+      let speaker: Speaker | null = null;
       const userId = `u-${Date.now()}`;
       const asstId = `a-${Date.now()}`;
+      // The reply's id changes from a temporary one to the saved one when it completes;
+      // late callbacks (e.g. speech starting) must patch whichever id is current.
+      const current = { id: asstId };
       setMessages((ms) => [...ms, { id: userId, role: "user", content: text, status: "complete" }, { id: asstId, role: "assistant", content: "", status: "streaming" }]);
 
       const ctrl = new AbortController();
       abortRef.current = ctrl;
       const started = performance.now();
+      if (speakIt && prefs) {
+        speaker = new Speaker(voiceRef.current, prefs);
+        speakerRef.current = speaker;
+        const t0 = opts.spokenAt ?? started;
+        speaker.onStart = () => {
+          setSpeaking(true);
+          patchAssistant(current.id, { voiceLatencyMs: Math.round(performance.now() - t0) });
+        };
+        speaker.onIdle = () => {
+          if (speakerRef.current === speaker) {
+            speakerRef.current = null;
+            setSpeaking(false);
+          }
+        };
+      }
       let gotFirst = false;
       try {
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, conversationId, deep }),
+          body: JSON.stringify({ text, conversationId, deep, voice: Boolean(opts.voice) }),
           signal: ctrl.signal,
         });
         if (!res.ok || !res.body) {
@@ -154,11 +205,16 @@ export function ChatView(props: {
                 patchAssistant(asstId, { firstTokenMs: Math.round(performance.now() - started) });
               }
               patchAssistant(asstId, (m) => ({ content: m.content + ev.text }));
+              speaker?.push(ev.text);
             } else if (ev.type === "done") {
               patchAssistant(asstId, { status: "complete", id: ev.assistantMessageId, costUsd: ev.costUsd, latencyMs: ev.latencyMs });
+              current.id = ev.assistantMessageId;
+              speaker?.finish();
               setSpend(ev.spend);
             } else if (ev.type === "error") {
               patchAssistant(asstId, (m) => ({ status: m.content ? "partial" : "error", content: m.content || ev.message }));
+              if (ev.code === "aborted") speaker?.cancel();
+              else speaker?.finish();
               if (ev.code !== "aborted") setWarnings((w) => [...w, ev.message]);
               if (ev.spend) setSpend(ev.spend);
             }
@@ -172,15 +228,54 @@ export function ChatView(props: {
         }));
       } finally {
         // Anything still marked streaming at this point was cut off.
-        patchAssistant(asstId, (m) => (m.status === "streaming" ? { status: m.content ? "partial" : "error", content: m.content || "No reply received." } : {}));
+        patchAssistant(current.id, (m) => (m.status === "streaming" ? { status: m.content ? "partial" : "error", content: m.content || "No reply received." } : {}));
         setBusy(false);
         abortRef.current = null;
         void refreshList();
         inputRef.current?.focus();
       }
     },
-    [busy, conversationId, deep, refreshList],
+    [busy, conversationId, deep, refreshList, prefs],
   );
+
+  // Push-to-talk: tap to start, tap again (or pause) to finish. Never listens in the background.
+  const toggleMic = () => {
+    setVoiceError(null);
+    if (listening) {
+      listenerRef.current?.stop();
+      return;
+    }
+    if (!prefs) return;
+    unlockSpeech(); // iOS: speech must be unlocked inside a tap
+    stopSpeaking(); // barge-in
+    const listener = new Listener(prefs.lang, {
+      onText: (t) => setInput(t),
+      onEnd: (finalText) => {
+        setListening(false);
+        listenerRef.current = null;
+        if (!finalText) return;
+        if (prefs.autoSend) void send(finalText, { voice: true, spokenAt: performance.now() });
+        else {
+          setInput(finalText);
+          inputRef.current?.focus();
+        }
+      },
+      onError: (m) => {
+        setListening(false);
+        setVoiceError(m);
+      },
+    });
+    listenerRef.current = listener;
+    setListening(true);
+    listener.start();
+  };
+
+  const cancelMic = () => {
+    listenerRef.current?.cancel();
+    listenerRef.current = null;
+    setListening(false);
+    setInput("");
+  };
 
   // Command Center quick-ask: /chat?q=...
   useEffect(() => {
@@ -191,7 +286,10 @@ export function ChatView(props: {
     }
   }, [props.initialQuery, send]);
 
-  const stop = () => abortRef.current?.abort();
+  const stop = () => {
+    abortRef.current?.abort();
+    stopSpeaking();
+  };
 
   const rename = async () => {
     if (!conversationId) return;
@@ -213,11 +311,12 @@ export function ChatView(props: {
       e.preventDefault();
       void send(input);
     }
-    if (e.key === "Escape" && busy) stop();
+    if (e.key === "Escape" && listening) cancelMic();
+    else if (e.key === "Escape" && (busy || speaking)) stop();
   };
 
   const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
-  const orbState = busy ? (lastAssistant?.content ? "speaking" : "thinking") : "idle";
+  const orbState = listening ? "listening" : speaking ? "speaking" : busy ? (lastAssistant?.content ? "speaking" : "thinking") : "idle";
 
   return (
     <div className="chat">
@@ -260,7 +359,9 @@ export function ChatView(props: {
               <div className="chat-empty">
                 <Orb size={88} />
                 <h2>How can I help, Oliver?</h2>
-                <p className="small">Text only for now. Voice arrives in Phase 2.</p>
+                <p className="small">
+                  {micAvailable ? "Type, or tap the microphone and talk." : <>Type below. To talk instead, turn on voice in <a href="/settings#voice">Settings</a>.</>}
+                </p>
                 <div className="suggestions">
                   {SUGGESTIONS.map((s) => (
                     <button key={s} className="btn btn-sm" onClick={() => void send(s)}>{s}</button>
@@ -283,6 +384,7 @@ export function ChatView(props: {
                       {m.routeReason && <span>{m.routeReason}</span>}
                       {typeof m.costUsd === "number" && <span>{usd(m.costUsd, 4)}</span>}
                       {m.firstTokenMs !== undefined && <span>first word {(m.firstTokenMs / 1000).toFixed(1)}s</span>}
+                      {m.voiceLatencyMs !== undefined && <span title="From when you finished speaking to Maverick's first spoken word">🔊 spoke after {(m.voiceLatencyMs / 1000).toFixed(1)}s</span>}
                       {m.status === "partial" && <span className="badge badge-warn">incomplete</span>}
                     </div>
                   )}
@@ -305,6 +407,20 @@ export function ChatView(props: {
             {warnings.map((w, i) => (
               <div key={i} className="alert alert-warn" role="status">{w}</div>
             ))}
+            {voiceError && <div className="alert alert-error" role="alert">{voiceError}</div>}
+            {listening && (
+              <div className="voice-bar listening" role="status">
+                <span className="rec-dot" aria-hidden />
+                <span className="vb-text">Listening… tap the mic when you&apos;re done.</span>
+                <button type="button" className="btn btn-sm btn-ghost" onClick={cancelMic}>Cancel</button>
+              </div>
+            )}
+            {speaking && !listening && (
+              <div className="voice-bar" role="status">
+                <span className="vb-text">🔊 Maverick is speaking…</span>
+                <button type="button" className="btn btn-sm btn-ghost" onClick={stopSpeaking}>Stop speaking</button>
+              </div>
+            )}
             <form
               className="composer-box"
               onSubmit={(e) => {
@@ -328,6 +444,19 @@ export function ChatView(props: {
                 maxLength={20000}
                 autoFocus
               />
+              {micAvailable && (
+                <button
+                  type="button"
+                  className={`btn mic-btn${listening ? " on" : ""}`}
+                  onClick={toggleMic}
+                  disabled={busy && !listening}
+                  aria-pressed={listening}
+                  aria-label={listening ? "Finish speaking" : "Talk to Maverick"}
+                  title={listening ? "Finish speaking" : "Tap and talk"}
+                >
+                  <Icon.mic width={18} />
+                </button>
+              )}
               {busy ? (
                 <button type="button" className="btn" onClick={stop} aria-label="Stop generating">
                   <Icon.stop width={18} />

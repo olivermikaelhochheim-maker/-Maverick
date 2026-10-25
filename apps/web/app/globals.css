@@ -292,3 +292,15 @@ td { padding: 0.55rem 0.5rem; border-bottom: 1px solid var(--border); vertical-a
 .segmented { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 10px; padding: 3px; gap: 2px; }
 .segmented button { font: inherit; font-size: 0.85rem; background: transparent; color: var(--muted); border: 0; border-radius: 7px; padding: 0.35rem 0.75rem; min-height: 34px; cursor: pointer; }
 .segmented button.on { background: var(--accent-soft); color: var(--accent); }
+
+/* ---------- Voice ---------- */
+.mic-btn.on { background: #3a1218; border-color: var(--danger); color: var(--danger); }
+.voice-bar { display: flex; align-items: center; gap: 0.6rem; flex-wrap: nowrap; font-size: 0.88rem; color: var(--muted); background: var(--panel); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 0.4rem 0.6rem; margin-bottom: 0.6rem; }
+.voice-bar.listening { border-color: #5a2a33; color: #ffb4b4; background: #2a1016; }
+.voice-bar .btn { margin-left: auto; }
+.rec-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); animation: pulse 1.2s ease-in-out infinite; }
+.orb.listening .core { animation: pulse 0.9s ease-in-out infinite; }
+.orb.listening .ring-a { animation: spin 3s linear infinite; }
+input[type="range"] { padding: 0; border: 0; background: none; min-height: 32px; accent-color: var(--accent); box-shadow: none; }
+.voice-bar .vb-text { flex: 1; min-width: 0; }
+.rec-dot { flex-shrink: 0; }
