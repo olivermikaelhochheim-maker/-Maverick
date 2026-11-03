@@ -53,7 +53,7 @@ else if (ak) ok(`Anthropic API key (${ak}): live mode`);
 else info("No Anthropic API key: Maverick will run in free mock mode");
 where("MAVERICK_VAPID_PRIVATE_KEY") && env.get("MAVERICK_VAPID_PUBLIC_KEY")
   ? ok("Notification keys configured")
-  : bad("Notification keys missing", "Run: pnpm configure");
+  : info("Notification keys will be generated automatically on first start");
 if (env.get("MAVERICK_CALENDAR_PROVIDER") === "mock") info("Calendar: demo calendar (MAVERICK_CALENDAR_PROVIDER=mock)");
 else if (where("GOOGLE_CLIENT_ID") && where("GOOGLE_CLIENT_SECRET")) ok("Google Calendar credentials configured (connect it in Settings)");
 else info("Google Calendar not set up (optional; README → Connect Google Calendar)");

@@ -1,4 +1,5 @@
-import { listAudit, listSessions } from "@maverick/core";
+import { listAudit, listSessions, recoveryCodesLeft, requireTwoFactor } from "@maverick/core";
+import { TwoFactorCard } from "@/components/TwoFactor";
 import { SessionsPanel } from "@/components/SessionsPanel";
 import { getMaverick, getSessionToken, requireUser } from "@/lib/server";
 
@@ -35,6 +36,14 @@ const ACTION_LABELS: Record<string, string> = {
   "data.exported": "Data exported",
   "account.created": "Account created",
   "login.succeeded": "Signed in",
+  "login.password_ok": "Password correct, waiting for code",
+  "login.code_failed": "Wrong sign-in code",
+  "login.code_locked": "Sign-in codes temporarily locked",
+  "login.succeeded_recovery_code": "Signed in with a recovery code",
+  "two_factor.enabled": "Two-step login turned on",
+  "two_factor.disabled": "Two-step login turned off",
+  "two_factor.recovery_codes_regenerated": "New recovery codes generated",
+  "data.imported": "Data imported",
   "login.failed": "Failed sign-in attempt",
   "login.locked": "Sign-in temporarily locked (too many failures)",
   logout: "Signed out",
@@ -64,6 +73,10 @@ export default async function SecurityPage() {
         </div>
       </div>
       <div className="cards">
+        <section className="card span-12" aria-labelledby="h-2fa">
+          <h3 id="h-2fa">Two-step login</h3>
+          <TwoFactorCard enabled={Boolean(user.totpEnabled)} required={requireTwoFactor()} recoveryLeft={user.totpEnabled ? await recoveryCodesLeft(m.db, user.id) : 0} />
+        </section>
         <section className="card span-6">
           <h3>Signed-in devices</h3>
           <SessionsPanel initial={sessions} />

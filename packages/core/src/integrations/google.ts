@@ -19,8 +19,13 @@ export interface GoogleConfig {
   redirectUri: string;
 }
 
+/** Maverick's own address. On Render this is provided automatically (RENDER_EXTERNAL_URL). */
+export function publicBaseUrl(): string {
+  return process.env.MAVERICK_PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || "http://localhost:3000";
+}
+
 /** Google OAuth client credentials from env/Keychain. Null when not set up yet. */
-export function googleConfig(publicUrl = process.env.MAVERICK_PUBLIC_URL || "http://localhost:3000"): GoogleConfig | null {
+export function googleConfig(publicUrl = publicBaseUrl()): GoogleConfig | null {
   const clientId = getSecret("GOOGLE_CLIENT_ID");
   const clientSecret = getSecret("GOOGLE_CLIENT_SECRET");
   if (!clientId || !clientSecret) return null;

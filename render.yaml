@@ -1,0 +1,33 @@
+# Render Blueprint: one-click cloud setup for Maverick.
+# Render → New → Blueprint → pick this GitHub repo. See docs/cloud.md.
+services:
+  - type: web
+    name: maverick
+    runtime: docker
+    plan: starter            # always on (the free plan sleeps, which would stop briefings)
+    region: frankfurt        # closest to Norway
+    healthCheckPath: /api/health
+    autoDeploy: true         # every update pushed to GitHub goes live automatically
+    disk:
+      name: maverick-data    # the embedded database lives here; survives restarts and deploys
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: MAVERICK_DATA_DIR
+        value: /data/pglite
+      # Encrypts all your data. Copy it into your password manager after the first deploy.
+      - key: MAVERICK_DATA_KEY
+        generateValue: true
+      # One-time code to create your account. Find it under Environment in the Render dashboard.
+      - key: MAVERICK_SETUP_CODE
+        generateValue: true
+      # On the internet, every sign-in needs a code from your phone.
+      - key: MAVERICK_REQUIRE_2FA
+        value: "1"
+      - key: MAVERICK_TRUST_PROXY
+        value: "1"
+      - key: MAVERICK_COOKIE_SECURE
+        value: "1"
+      # Paste your Anthropic API key when Render asks.
+      - key: ANTHROPIC_API_KEY
+        sync: false

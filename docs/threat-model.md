@@ -5,7 +5,8 @@ Assets: Oliver's conversations, memories, goals and tasks, personal notes, Googl
 | Threat | Mitigation now | Gap / later |
 |---|---|---|
 | Someone on the same Wi-Fi opens Maverick | Login required; one account only; setup code needed to create it; lockout after failed logins | LAN traffic is plain HTTP. Use Tailscale (encrypted) away from home and on untrusted networks |
-| Password guessing | scrypt hashes; 5 failures/15 min per email+IP, 20 per email overall | Passkeys/TOTP before any public deployment (ADR 0004) |
+| Password guessing / stolen password | scrypt hashes; 5 failures/15 min per email+IP, 20 per email overall; **two-step login (TOTP) required when on the internet**: a password alone opens nothing; codes are replay-protected and locked out after 5 failures | Passkeys later; SIM-free TOTP is phishable by a real-time proxy attack |
+| Internet exposure (cloud) | HTTPS + HSTS; first-run setup requires a secret setup code; client IP taken from the proxy's own X-Forwarded-For entry; container runs as an unprivileged user | The host (Render) can read environment variables, including the data key |
 | Stolen session cookie | HttpOnly, SameSite=Lax, Secure on HTTPS, hashed at rest, 30-day expiry, per-device revoke, revoke-all on password change | No IP/device binding |
 | Cross-site request forgery | Origin check on every write + SameSite cookies | – |
 | Clickjacking / XSS | CSP, `frame-ancestors 'none'`, X-Frame-Options DENY; model output rendered via a React Markdown renderer (no raw HTML) | CSP still allows inline scripts (Next.js requirement); nonce-based CSP later |

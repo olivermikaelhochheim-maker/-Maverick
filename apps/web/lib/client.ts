@@ -21,6 +21,7 @@ export async function api<T = unknown>(path: string, init: { method?: string; bo
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     if (res.status === 401 && data.code === "unauthenticated") window.location.href = "/login";
+    if (res.status === 403 && data.code === "two_factor_setup_required") window.location.href = "/two-factor";
     throw new ApiError(data.error ?? `Request failed (${res.status})`, data.code ?? "unknown", res.status);
   }
   return data as T;

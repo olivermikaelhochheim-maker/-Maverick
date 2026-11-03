@@ -1,4 +1,26 @@
+import { createHmac } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
+
+/** RFC 6238 code, so tests can act as Oliver's authenticator app. */
+function totp(secretB32: string, t = Date.now()): string {
+  const A = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = 0;
+  let v = 0;
+  const out: number[] = [];
+  for (const ch of secretB32.replace(/\s+/g, "")) {
+    v = (v << 5) | A.indexOf(ch);
+    bits += 5;
+    if (bits >= 8) {
+      out.push((v >>> (bits - 8)) & 255);
+      bits -= 8;
+    }
+  }
+  const msg = Buffer.alloc(8);
+  msg.writeBigUInt64BE(BigInt(Math.floor(t / 30000)));
+  const h = createHmac("sha1", Buffer.from(out)).update(msg).digest();
+  const o = h[h.length - 1]! & 15;
+  return String((((h[o]! & 127) << 24) | (h[o + 1]! << 16) | (h[o + 2]! << 8) | h[o + 3]!) % 1e6).padStart(6, "0");
+}
 
 const EMAIL = "oliver@example.com";
 const PASSWORD = "a long test passphrase";
@@ -11,6 +33,8 @@ async function ensureAccount(page: Page) {
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByLabel("Confirm password").fill(PASSWORD);
     await page.getByRole("button", { name: "Create my account" }).click();
+    await page.waitForURL(/\/two-factor\?welcome=1/);
+    await page.getByRole("link", { name: "Skip for now" }).click();
     await page.waitForURL(/\/settings\?welcome=1/);
     return;
   }
@@ -39,8 +63,11 @@ test.describe.serial("Maverick", () => {
     await expect(page.locator(".alert-error")).toContainText("setup code is not correct");
     await page.getByLabel("Setup code").fill("E2E-CODE");
     await page.getByRole("button", { name: "Create my account" }).click();
-    await page.waitForURL(/\/settings\?welcome=1/);
+    await page.waitForURL(/\/two-factor\?welcome=1/);
     await expect(page.getByText("Account created")).toBeVisible();
+    // Optional on a local install: offered, skippable.
+    await page.getByRole("link", { name: "Skip for now" }).click();
+    await page.waitForURL(/\/settings\?welcome=1/);
   });
 
   test("signed-out visitors are sent to login and APIs refuse them", async ({ page, request }) => {
@@ -332,8 +359,8 @@ test.describe.serial("Maverick", () => {
     await expect(page.locator("form [role=status]")).toContainText("Saved");
     await page.reload();
     await expect(page.getByLabel("Evening check-in time")).toHaveValue("20:30");
-    // Server has no push keys in this test run: the panel says so instead of pretending.
-    await expect(page.getByText("Notifications aren't set up on the server yet")).toBeVisible();
+    // Push keys are generated automatically, so the server side is always ready.
+    await expect(page.getByText("Notifications aren't set up on the server yet")).toHaveCount(0);
     await expect(page.getByText("Demo calendar in use")).toBeVisible();
   });
 
@@ -347,6 +374,45 @@ test.describe.serial("Maverick", () => {
     expect(JSON.stringify(data)).not.toContain("v1:");
   });
 
+  test("two-step login: set up with QR/setup key, sign in with a code, then turn off", async ({ page }) => {
+    test.skip(test.info().project.name !== "desktop", "one device is enough; it changes the shared account");
+    await ensureAccount(page);
+    await page.goto("/security");
+    await page.getByRole("link", { name: "Set up two-step login" }).click();
+    await page.getByRole("button", { name: "Set up two-step login" }).click();
+    await expect(page.getByAltText("QR code for your authenticator app")).toBeVisible();
+    const secret = (await page.locator(".setup-key").innerText()).replace(/\s+/g, "");
+    await page.getByLabel("6-digit code").fill(totp(secret, Date.now() - 30_000));
+    await page.getByRole("button", { name: "Turn on two-step login" }).click();
+    await expect(page.getByLabel("Recovery codes", { exact: true })).toContainText(/[A-Z0-9]{4}-[A-Z0-9]{4}/);
+    await expect(page.getByRole("button", { name: "Continue" })).toBeDisabled();
+    await page.getByLabel("I've saved my recovery codes").check();
+    await page.getByRole("button", { name: "Continue" }).click();
+
+    // Sign out, sign in: password, then code.
+    await page.goto("/settings");
+    await page.getByRole("button", { name: "Sign out" }).click();
+    await page.waitForURL(/\/login/);
+    await page.getByLabel("Email").fill(EMAIL);
+    await page.getByLabel("Password").fill(PASSWORD);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.getByLabel("6-digit code from your authenticator app").fill("000000");
+    await page.getByRole("button", { name: "Verify" }).click();
+    await expect(page.locator(".alert-error")).toContainText("isn't right");
+    await page.getByLabel("6-digit code from your authenticator app").fill(totp(secret));
+    await page.getByRole("button", { name: "Verify" }).click();
+    await page.waitForURL((u) => u.pathname === "/");
+
+    // Turn it off again so the other tests can sign in with just a password.
+    await page.goto("/security");
+    await expect(page.getByText("Every sign-in needs a code from your phone")).toBeVisible();
+    await page.getByRole("button", { name: "Turn off" }).click();
+    await page.getByLabel("Password").fill(PASSWORD);
+    await page.getByLabel("Current 6-digit code").fill(totp(secret, Date.now() + 30_000));
+    await page.getByRole("button", { name: "Turn off two-step login" }).click();
+    await expect(page.getByRole("link", { name: "Set up two-step login" })).toBeVisible();
+  });
+
   test("security headers are present", async ({ request }) => {
     const res = await request.get("/login");
     const h = res.headers();
@@ -355,5 +421,6 @@ test.describe.serial("Maverick", () => {
     // Microphone allowed only for Maverick itself (push-to-talk); never for embedded third parties.
     expect(h["permissions-policy"]).toContain("microphone=(self)");
     expect(h["permissions-policy"]).toContain("camera=()");
+    expect(h["strict-transport-security"]).toBe("max-age=31536000");
   });
 });

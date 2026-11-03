@@ -5,6 +5,7 @@ import { getMaverick } from "./maverick";
 import {
   SESSION_COOKIE,
   UserFacingError,
+  requireTwoFactor,
   log,
   validateSession,
   type Maverick,
@@ -22,22 +23,29 @@ export async function getCurrentUser(): Promise<User | null> {
   return validateSession(db, await getSessionToken());
 }
 
-/** For pages: send signed-out visitors to the login screen. */
+/**
+ * For pages: send signed-out visitors to the login screen, and (on the cloud server)
+ * send anyone without two-step login to set it up before anything else.
+ */
 export async function requireUser(): Promise<User> {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  if (requireTwoFactor() && !user.totpEnabled) redirect("/two-factor");
   return user;
 }
 
 /**
  * Client IP, used only (hashed) for login rate limiting and the audit log.
  * Forwarded headers are trusted only when MAVERICK_TRUST_PROXY=1, i.e. when
- * running behind a known reverse proxy; otherwise anyone could spoof them.
+ * running behind a known reverse proxy (the cloud host). We take the LAST
+ * X-Forwarded-For entry: the one the host's proxy appended. Earlier entries
+ * can be written by the client and would let an attacker dodge the lockout.
  */
 export async function clientIp(): Promise<string | null> {
   if (process.env.MAVERICK_TRUST_PROXY !== "1") return "direct";
   const h = await headers();
-  return h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || null;
+  const chain = h.get("x-forwarded-for")?.split(",").map((s) => s.trim()).filter(Boolean) ?? [];
+  return chain.at(-1) || h.get("x-real-ip") || null;
 }
 
 export function json(data: unknown, status = 200): Response {
@@ -75,13 +83,19 @@ export function assertSameOrigin(req: Request): void {
   }
 }
 
-/** Authenticated API entry point: origin check (for writes) + session. */
-export async function apiUser(req: Request): Promise<{ maverick: Maverick; user: User; token: string }> {
+/**
+ * Authenticated API entry point: origin check (for writes) + fully signed-in session.
+ * Where two-step login is required, everything except its own setup is refused until it's on.
+ */
+export async function apiUser(req: Request, opts: { allowWithoutTwoFactor?: boolean } = {}): Promise<{ maverick: Maverick; user: User; token: string }> {
   if (req.method !== "GET" && req.method !== "HEAD") assertSameOrigin(req);
   const maverick = await getMaverick();
   const token = await getSessionToken();
   const user = await validateSession(maverick.db, token);
   if (!user || !token) throw new UserFacingError("Please sign in again.", "unauthenticated", 401);
+  if (requireTwoFactor() && !user.totpEnabled && !opts.allowWithoutTwoFactor) {
+    throw new UserFacingError("Set up two-step login first.", "two_factor_setup_required", 403);
+  }
   return { maverick, user, token };
 }
 

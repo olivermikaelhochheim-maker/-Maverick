@@ -304,3 +304,7 @@ td { padding: 0.55rem 0.5rem; border-bottom: 1px solid var(--border); vertical-a
 input[type="range"] { padding: 0; border: 0; background: none; min-height: 32px; accent-color: var(--accent); box-shadow: none; }
 .voice-bar .vb-text { flex: 1; min-width: 0; }
 .rec-dot { flex-shrink: 0; }
+.qr-box { background: #fff; border-radius: 12px; padding: 10px; width: max-content; margin: 0.8rem 0; }
+.qr-box img { display: block; }
+.setup-key { word-break: break-all; letter-spacing: 0.05em; }
+.recovery-codes { font-size: 1rem; line-height: 1.8; columns: 2; text-align: center; }

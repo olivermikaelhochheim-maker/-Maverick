@@ -1,6 +1,6 @@
 # Maverick: progress log
 
-## Status: Milestone 3a (voice, built-in engines) built and tested with simulated speech. Next: Oliver tries it on Mac/iPhone, then picks a premium voice.
+## Status: Milestone 4 (cloud-ready + two-step login) built and tested, including the real Docker image. Next: Oliver deploys to Render (docs/cloud.md).
 
 Last updated: 2026-10-24 · Code: https://github.com/olivermikaelhochheim-maker/-Maverick
 
@@ -38,12 +38,21 @@ Single-user auth, streaming chat, model routing (Haiku/Sonnet/Opus 5.5), hard bu
 - Settings → Voice on this device: voice picker with preview, speed, pitch, when to speak, language (EN/NO/PL/DE), privacy notes, how to install Enhanced voices
 - ADR 0011; microphone allowed for Maverick's own pages only
 
+### Milestone 4: Cloud-ready
+- **Two-step login (TOTP)**: QR / setup key, 10 single-use recovery codes, replay protection, lockout, 10-minute password-only sessions; required when `MAVERICK_REQUIRE_2FA=1` (cloud), optional locally; manage on Security
+- **Import** of an export file into a fresh install (Mac → cloud), re-encrypted with the new key
+- Web Push keys generated automatically and stored encrypted; any long secret accepted as the data key
+- Dockerfile (unprivileged runtime, health check), `render.yaml` blueprint (Starter, Frankfurt, 1 GB disk, generated secrets), HSTS, proxy-safe client IP
+- Guide: docs/cloud.md · ADR 0012
+- Verified: Docker image built and run like Render (custom port, root-owned disk, host-style key, 2FA required); scripted first-run + restart passed
+
 ## Test results (2026-10-24, Linux cloud container)
 | Suite | Result |
 |---|---|
 | TypeScript typecheck (core + web) | ✅ pass |
-| Core unit + integration (Vitest, real embedded Postgres) | ✅ 105 / 105 |
-| Browser end-to-end (Playwright, production build; iPhone 15 + desktop) | ✅ 37 passed, 1 skipped by design |
+| Core unit + integration (Vitest, real embedded Postgres) | ✅ 120 / 120 |
+| Browser end-to-end (Playwright, production build; iPhone 15 + desktop) | ✅ 38 passed, 2 skipped by design |
+| Docker image smoke test (cloud configuration, restart) | ✅ 17 / 17 checks |
 
 New coverage: Oslo DST time maths and quiet hours across midnight; memory provenance, expiry, selection reasons and token cap; task ranking and reminders; accept/edit/dismiss semantics; proposal tool validation and limits; strict-schema compatibility; chat context (memories, goals, tasks, calendar) and tool events; Google token refresh, unselected calendars, declined events, revoked tokens, missing-scope refusal; push consent, quiet hours, daily cap, dead subscriptions, endpoint allowlist; briefing template vs. model, budget fallback, once-per-day scheduling, catch-up, opt-out; export.
 
@@ -71,6 +80,9 @@ pnpm check                 # health check
 pnpm test                  # unit/integration tests
 pnpm test:e2e              # browser tests (after pnpm build)
 ```
+
+## ⚠️ Not yet verified: Render itself
+The blueprint's exact behaviour on Render (field names, generated-value format, disk ownership) can only be confirmed by deploying. The design tolerates the likely variations.
 
 ## Monthly cost estimate
 Typical ~$10 (chat ~$8 + briefings ~$1.20 + extra context ~$0.60); light ~$3; heavy capped at $40. Hosting $0 (Mac), Google API $0, push $0. Details: `docs/budget.md`.

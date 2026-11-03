@@ -32,6 +32,9 @@ Typical total moves from ~$7.50 to **~$10/month**. Briefings fall back to a free
 ## Voice (milestone 3, built-in engines)
 $0. Speech-to-text by the browser (Apple/Google), speech by the device's own voices. Voice replies are shorter, so they cost slightly *less* in model tokens than typed ones.
 
+## Cloud hosting (Render)
+Starter web service ~$7 + 1 GB disk ~$0.25 = **~$7.25/month** (third-party price pages, Nov 2026; verify on render.com/pricing). Typical total: **~$17/month** (Claude ~$10 + hosting ~$7.25).
+
 ## Later phases (planning ranges, *unverified*)
 
 | Item | Phase | Rough monthly |

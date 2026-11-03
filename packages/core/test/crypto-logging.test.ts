@@ -31,8 +31,15 @@ describe("field encryption", () => {
     expect(() => other.decrypt(cipher.encrypt("secret"))).toThrow();
   });
 
-  it("refuses keys of the wrong length", () => {
-    expect(() => new FieldCipher(Buffer.alloc(16).toString("base64"))).toThrow(/32 bytes/);
+  it("refuses short keys", () => {
+    expect(() => new FieldCipher(Buffer.alloc(16).toString("base64"))).toThrow(/32/);
+  });
+
+  it("accepts a long secret in another format by deriving a key, deterministically", () => {
+    const secret = "hosting-generated-" + "x".repeat(40);
+    const enc = new FieldCipher(secret).encrypt("hello");
+    expect(new FieldCipher(secret).decrypt(enc)).toBe("hello");
+    expect(() => new FieldCipher(secret + "y").decrypt(enc)).toThrow();
   });
 });
 

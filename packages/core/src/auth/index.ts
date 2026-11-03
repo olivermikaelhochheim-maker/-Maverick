@@ -20,11 +20,22 @@ export interface User {
   id: string;
   email: string;
   displayName: string;
+  /** Two-step login is switched on for this account. */
+  totpEnabled?: boolean;
 }
 
-type UserRow = { id: string; email: string; display_name: string; password_hash: string };
+export type UserRow = {
+  id: string;
+  email: string;
+  display_name: string;
+  password_hash: string;
+  totp_enabled_at?: Date | string | null;
+};
 
-const toUser = (r: UserRow): User => ({ id: r.id, email: r.email, displayName: r.display_name });
+export const toUser = (r: UserRow): User => ({ id: r.id, email: r.email, displayName: r.display_name, totpEnabled: Boolean(r.totp_enabled_at) });
+
+/** How long a password-only session may wait for its 6-digit code. */
+export const MFA_PENDING_MINUTES = 10;
 
 export function hashIp(ip: string | null | undefined): string | undefined {
   return ip ? sha256(`ip:${ip}`).slice(0, 16) : undefined;
@@ -87,7 +98,7 @@ async function recentFailures(db: Db, key: string): Promise<number> {
 export async function login(
   db: Db,
   input: { email: string; password: string; ip?: string | null; userAgent?: string | null },
-): Promise<{ user: User; token: string; expiresAt: Date }> {
+): Promise<{ user: User; token: string; expiresAt: Date; mfaRequired: boolean }> {
   const email = input.email.trim().toLowerCase();
   const ipHash = hashIp(input.ip);
   const key = sha256(`login:${email}:${ipHash ?? "-"}`);
@@ -118,10 +129,19 @@ export async function login(
     throw new UserFacingError("Email or password is incorrect.", "bad_credentials", 401);
   }
 
-  const { token, expiresAt } = await createSession(db, row.id, { ipHash, userAgent: input.userAgent ?? undefined });
+  const user = toUser(row);
+  // With two-step login on, the password alone only opens a short-lived session that
+  // can do nothing except submit the 6-digit code.
+  const mfaRequired = Boolean(user.totpEnabled);
+  const { token, expiresAt } = await createSession(db, row.id, {
+    ipHash,
+    userAgent: input.userAgent ?? undefined,
+    mfaVerified: !mfaRequired,
+    ttlMs: mfaRequired ? MFA_PENDING_MINUTES * 60_000 : undefined,
+  });
   await db.query("UPDATE users SET last_login_at = now() WHERE id = $1", [row.id]);
-  await audit(db, { userId: row.id, actor: "user", action: "login.succeeded", ipHash });
-  return { user: toUser(row), token, expiresAt };
+  await audit(db, { userId: row.id, actor: "user", action: mfaRequired ? "login.password_ok" : "login.succeeded", ipHash });
+  return { user, token, expiresAt, mfaRequired };
 }
 
 // A valid hash of a random string, used to equalise timing for unknown emails.
@@ -131,23 +151,23 @@ const DUMMY_HASH =
 export async function createSession(
   db: Db,
   userId: string,
-  meta: { ipHash?: string; userAgent?: string } = {},
+  meta: { ipHash?: string; userAgent?: string; mfaVerified?: boolean; ttlMs?: number } = {},
 ): Promise<{ token: string; expiresAt: Date }> {
   const token = randomToken(32);
-  const expiresAt = new Date(Date.now() + SESSION_TTL_DAYS * 86_400_000);
+  const expiresAt = new Date(Date.now() + (meta.ttlMs ?? SESSION_TTL_DAYS * 86_400_000));
   await db.query(
-    "INSERT INTO sessions (id, user_id, expires_at, user_agent, ip_hash) VALUES ($1, $2, $3, $4, $5)",
-    [sha256(token), userId, expiresAt.toISOString(), meta.userAgent?.slice(0, 200) ?? null, meta.ipHash ?? null],
+    "INSERT INTO sessions (id, user_id, expires_at, user_agent, ip_hash, mfa_verified) VALUES ($1, $2, $3, $4, $5, $6)",
+    [sha256(token), userId, expiresAt.toISOString(), meta.userAgent?.slice(0, 200) ?? null, meta.ipHash ?? null, meta.mfaVerified ?? true],
   );
   return { token, expiresAt };
 }
 
-/** Resolve a session cookie to a user. Expired sessions are deleted. */
-export async function validateSession(db: Db, token: string | undefined | null): Promise<User | null> {
+/** A session's user and whether its second step is done. Expired sessions are deleted. */
+export async function sessionState(db: Db, token: string | undefined | null): Promise<{ user: User; mfaVerified: boolean } | null> {
   if (!token || token.length > 200) return null;
   const id = sha256(token);
-  const { rows } = await db.query<UserRow & { expires_at: Date | string; last_seen_at: Date | string }>(
-    `SELECT u.*, s.expires_at, s.last_seen_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = $1`,
+  const { rows } = await db.query<UserRow & { expires_at: Date | string; last_seen_at: Date | string; mfa_verified: boolean }>(
+    `SELECT u.*, s.expires_at, s.last_seen_at, s.mfa_verified FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = $1`,
     [id],
   );
   const row = rows[0];
@@ -160,7 +180,16 @@ export async function validateSession(db: Db, token: string | undefined | null):
   if (Date.now() - new Date(row.last_seen_at).getTime() > 5 * 60_000) {
     await db.query("UPDATE sessions SET last_seen_at = now() WHERE id = $1", [id]);
   }
-  return toUser(row);
+  return { user: toUser(row), mfaVerified: row.mfa_verified };
+}
+
+/**
+ * Resolve a session cookie to a fully signed-in user. A session still waiting
+ * for its 6-digit code counts as signed out everywhere except the code step.
+ */
+export async function validateSession(db: Db, token: string | undefined | null): Promise<User | null> {
+  const state = await sessionState(db, token);
+  return state?.mfaVerified ? state.user : null;
 }
 
 export async function logout(db: Db, token: string | undefined | null, userId?: string): Promise<void> {
@@ -179,6 +208,7 @@ export interface SessionInfo {
 }
 
 export async function listSessions(db: Db, userId: string, currentToken?: string): Promise<SessionInfo[]> {
+  await db.query("DELETE FROM sessions WHERE user_id = $1 AND mfa_verified = false AND expires_at <= now()", [userId]);
   const current = currentToken ? sha256(currentToken) : null;
   const { rows } = await db.query<{
     id: string;
@@ -186,7 +216,7 @@ export async function listSessions(db: Db, userId: string, currentToken?: string
     last_seen_at: Date | string;
     expires_at: Date | string;
     user_agent: string | null;
-  }>("SELECT id, created_at, last_seen_at, expires_at, user_agent FROM sessions WHERE user_id = $1 ORDER BY last_seen_at DESC", [
+  }>("SELECT id, created_at, last_seen_at, expires_at, user_agent FROM sessions WHERE user_id = $1 AND mfa_verified ORDER BY last_seen_at DESC", [
     userId,
   ]);
   return rows.map((r) => ({

@@ -4,6 +4,7 @@ import { LogoutButton } from "@/components/AuthForms";
 import { CalendarPanel } from "@/components/CalendarPanel";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
 import { VoicePanel } from "@/components/VoicePanel";
+import { ImportPanel } from "@/components/ImportPanel";
 import { PasswordForm, SettingsForm } from "@/components/SettingsForm";
 import { getMaverick, requireUser } from "@/lib/server";
 
@@ -54,6 +55,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <h2>Your data</h2>
         <p className="muted small">Download everything Maverick holds about you (conversations, memories, goals, tasks, settings, audit log) as one JSON file.</p>
         <a className="btn btn-sm" href="/api/export">Export all data</a>
+        <h3 style={{ marginTop: "1.2rem" }}>Import</h3>
+        <ImportPanel />
       </section>
       <section className="card">
         <h2>Password</h2>

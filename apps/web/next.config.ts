@@ -40,6 +40,8 @@ const nextConfig: NextConfig = {
           // Microphone only for Maverick's own pages, and only after Oliver taps the mic button.
           { key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=(), payment=(), usb=()" },
           { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          // Browsers only honour this over https (cloud / Tailscale); it's ignored on http://localhost.
+          { key: "Strict-Transport-Security", value: "max-age=31536000" },
         ],
       },
     ];

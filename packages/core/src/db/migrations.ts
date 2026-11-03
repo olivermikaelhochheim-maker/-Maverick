@@ -230,6 +230,27 @@ export const MIGRATIONS: { id: string; sql: string }[] = [
       );
     `,
   },
+  {
+    id: "0003_two_factor_and_app_secrets",
+    sql: `
+      -- Two-step login (TOTP). The secret is encrypted; recovery codes are stored only as hashes.
+      ALTER TABLE users ADD COLUMN totp_secret_enc TEXT;
+      ALTER TABLE users ADD COLUMN totp_pending_enc TEXT;
+      ALTER TABLE users ADD COLUMN totp_enabled_at TIMESTAMPTZ;
+      ALTER TABLE users ADD COLUMN totp_last_step BIGINT NOT NULL DEFAULT -1;
+      ALTER TABLE users ADD COLUMN recovery_codes TEXT NOT NULL DEFAULT '[]';
+
+      -- A session created by a correct password but still waiting for the 6-digit code.
+      ALTER TABLE sessions ADD COLUMN mfa_verified BOOLEAN NOT NULL DEFAULT true;
+
+      -- Server-generated secrets (e.g. Web Push keys), encrypted with the data key.
+      CREATE TABLE app_secrets (
+        name       TEXT PRIMARY KEY,
+        value_enc  TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+    `,
+  },
 ];
 
 export async function migrate(db: Db): Promise<string[]> {

@@ -18,6 +18,11 @@ A private AI chief of staff and strategic advisor for Oliver. It runs on your Ma
 
 ---
 
+## Two ways to run Maverick
+
+- **In the cloud (recommended):** one address, any device, always on, ~$7.25/month hosting. Follow **[docs/cloud.md](docs/cloud.md)**.
+- **On your Mac:** free hosting, but only works while the Mac is on. Instructions below.
+
 ## Install on your Mac (about 15 minutes, once)
 
 You'll type commands into **Terminal** (⌘+Space, type "Terminal", Enter). Paste each command, press Enter, and wait for it to finish before the next.

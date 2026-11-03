@@ -28,6 +28,24 @@ export function generateVapidKeys(): { publicKey: string; privateKey: string } {
 }
 
 /**
+ * Push keys from the environment, or else generated once and kept (encrypted) in
+ * the database, so a fresh cloud install has notifications without a manual step.
+ * They must never change afterwards, or every device has to re-enable notifications.
+ */
+export async function loadOrCreateVapid(db: Db, cipher: FieldCipher): Promise<VapidConfig> {
+  const fromEnv = vapidConfig();
+  if (fromEnv) return fromEnv;
+  const subject = process.env.MAVERICK_VAPID_SUBJECT || "mailto:maverick@localhost";
+  const { rows } = await db.query<{ value_enc: string }>("SELECT value_enc FROM app_secrets WHERE name = 'vapid'");
+  if (rows[0]) return { ...(JSON.parse(cipher.decrypt(rows[0].value_enc)) as { publicKey: string; privateKey: string }), subject };
+  const keys = generateVapidKeys();
+  await db.query("INSERT INTO app_secrets (name, value_enc) VALUES ('vapid', $1) ON CONFLICT (name) DO NOTHING", [cipher.encrypt(JSON.stringify(keys))]);
+  // Re-read in case another process won the race.
+  const again = await db.query<{ value_enc: string }>("SELECT value_enc FROM app_secrets WHERE name = 'vapid'");
+  return { ...(JSON.parse(cipher.decrypt(again.rows[0]!.value_enc)) as { publicKey: string; privateKey: string }), subject };
+}
+
+/**
  * The server POSTs to whatever endpoint a subscription names, so only accept
  * the real browser push services. Anything else would let a crafted
  * subscription make Maverick call arbitrary URLs.
