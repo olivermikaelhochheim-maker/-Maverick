@@ -16,6 +16,7 @@ export { formatLocalNow, isValidTimeZone } from "./util/time";
 export { ndjsonStream } from "./chat/stream";
 export * from "./memory";
 export * from "./planning";
+export * from "./life";
 export * from "./suggestions";
 export * from "./context";
 export * from "./notify";

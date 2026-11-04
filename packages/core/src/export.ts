@@ -23,6 +23,7 @@ export async function exportAll(db: Db, cipher: FieldCipher, deps: ChatDeps, use
     goals: await deps.planning.listGoals(user.id),
     tasks: await deps.planning.listTasks(user.id, { status: "all", limit: 100_000 }),
     suggestions: await deps.suggestions.list(user.id, "all", 100_000),
+    life: deps.life ? await deps.life.exportAll(user.id) : undefined,
     conversations: withMessages,
     usage: usage.rows,
     // File contents aren't included (they can be large); download them from Files.

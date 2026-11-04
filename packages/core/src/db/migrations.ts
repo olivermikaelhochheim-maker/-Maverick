@@ -280,6 +280,69 @@ export const MIGRATIONS: { id: string; sql: string }[] = [
       CREATE INDEX message_files_file_idx ON message_files(file_id);
     `,
   },
+  {
+    id: "0005_life_dashboard",
+    sql: `
+      -- Habits. Titles and notes are encrypted; area, ordering and reminder time stay queryable.
+      CREATE TABLE habits (
+        id                 TEXT PRIMARY KEY,
+        user_id            TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        goal_id            TEXT REFERENCES goals(id) ON DELETE SET NULL,
+        title_enc          TEXT NOT NULL,
+        minimum_enc        TEXT,
+        why_enc            TEXT,
+        area               TEXT NOT NULL,
+        remind_time        TEXT,
+        last_reminded_date TEXT,
+        sort               INTEGER NOT NULL DEFAULT 0,
+        created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      CREATE INDEX habits_user_idx ON habits(user_id, sort);
+
+      -- Schedule history. A change adds a version from a date, so past weeks keep their old schedule and score.
+      CREATE TABLE habit_versions (
+        habit_id   TEXT NOT NULL REFERENCES habits(id) ON DELETE CASCADE,
+        valid_from TEXT NOT NULL,
+        kind       TEXT NOT NULL CHECK (kind IN ('days','weekly')),
+        days       TEXT NOT NULL DEFAULT '',
+        target     INTEGER NOT NULL DEFAULT 0 CHECK (target BETWEEN 0 AND 7),
+        status     TEXT NOT NULL CHECK (status IN ('active','paused','archived')),
+        PRIMARY KEY (habit_id, valid_from)
+      );
+
+      -- One row per habit per local day that has been logged. No row = not logged (distinct from missed).
+      CREATE TABLE habit_logs (
+        habit_id   TEXT NOT NULL REFERENCES habits(id) ON DELETE CASCADE,
+        user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        local_date TEXT NOT NULL,
+        status     TEXT NOT NULL CHECK (status IN ('done','missed','rest','sick')),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        PRIMARY KEY (habit_id, local_date)
+      );
+      CREATE INDEX habit_logs_user_date_idx ON habit_logs(user_id, local_date);
+
+      -- Whole-day adjustments: planned rest or illness excuses that day's day-habits.
+      CREATE TABLE day_flags (
+        user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        local_date TEXT NOT NULL,
+        flag       TEXT NOT NULL CHECK (flag IN ('rest','sick')),
+        PRIMARY KEY (user_id, local_date)
+      );
+
+      -- Journal. Everything written, including mood/energy ratings, is encrypted in data_enc.
+      CREATE TABLE journal_entries (
+        id         TEXT PRIMARY KEY,
+        user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        local_date TEXT NOT NULL,
+        data_enc   TEXT NOT NULL,
+        ai_allowed BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      CREATE INDEX journal_user_date_idx ON journal_entries(user_id, local_date DESC);
+    `,
+  },
 ];
 
 export async function migrate(db: Db): Promise<string[]> {

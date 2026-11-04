@@ -53,6 +53,13 @@ Single-user auth, streaming chat, model routing (Haiku/Sonnet/Opus 5.5), hard bu
 - Encrypted storage, safe downloads, 300 MB cap, per-file token/page estimate shown before sending
 - ADR 0013
 
+### Milestone 6: Life dashboard (2026-11-04)
+- **Life** in the menu: Today (habit check-in, daily and week-so-far completion with counts, by life area, next action, mood/energy trend), Journal (autosave, ratings, guided prompts, search, per-entry "Maverick may read this"), Habits (week grid with editable past days, schedule history, pause/archive, 8-week history, by weekday).
+- Habits and allowed journal entries feed chat context, the morning briefing, the evening check-in and the weekly review (model and template versions).
+- Per-habit push reminders, once a day, quiet hours respected.
+- Import from Daybook; Life included in Maverick export/import. Command Center shows "Life today".
+- ADR 0014. Tests: 13 new core tests, 2 new browser tests (both projects).
+
 ## Test results (2026-10-24, Linux cloud container)
 | Suite | Result |
 |---|---|

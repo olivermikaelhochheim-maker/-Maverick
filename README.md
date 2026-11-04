@@ -8,6 +8,7 @@ A private AI chief of staff and strategic advisor for Oliver. It runs on your Ma
 - **Goals & tasks** with priorities, due dates and reminders.
 - **Suggestion inbox**: Maverick thinks ahead and proposes memories, tasks, goals and actions. Nothing takes effect until you accept it.
 - **Briefings**: morning briefing (05:30), evening check-in (21:00) and weekly review (Sunday 18:00), built from your calendar, tasks and goals.
+- **Life**: habits (daily or N× per week, minimum versions, schedule history, rest/illness days, optional reminders), a journal with mood/energy ratings and guided prompts, weekly history. Feeds the briefings. Imports Daybook exports.
 - **Google Calendar**, read-only.
 - **Push notifications** on iPhone and Mac, never during quiet hours (22:00–05:00).
 - Encryption at rest, an audit log of every action, device management.

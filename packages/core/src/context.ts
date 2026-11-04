@@ -1,6 +1,7 @@
 import type { Settings } from "./settings";
 import type { PlanningStore, Goal, Task } from "./planning";
 import type { SuggestionStore } from "./suggestions";
+import type { LifeStore } from "./life";
 import type { AgendaService, Agenda } from "./integrations/calendar";
 import { renderAgenda } from "./integrations/calendar";
 import { localParts } from "./util/time";
@@ -11,23 +12,26 @@ export interface StateSnapshot {
   tasks: Task[];
   pendingSuggestions: number;
   agenda: Agenda;
+  /** Rendered habit status for the model ("" when there are no habits) */
+  life: string;
 }
 
 /** Gather Oliver's current state: goals, open tasks, today's calendar, pending inbox. */
 export async function snapshot(
-  deps: { planning: PlanningStore; suggestions: SuggestionStore; agenda: AgendaService },
+  deps: { planning: PlanningStore; suggestions: SuggestionStore; agenda: AgendaService; life?: LifeStore },
   userId: string,
   settings: Settings,
   now = new Date(),
 ): Promise<StateSnapshot> {
   const localDate = localParts(settings.timezone, now).date;
-  const [goals, tasks, pending, agenda] = await Promise.all([
+  const [goals, tasks, pending, agenda, life] = await Promise.all([
     deps.planning.listGoals(userId, { activeOnly: true }),
     deps.planning.listTasks(userId, { status: "open", limit: 12 }),
     deps.suggestions.list(userId, "pending", 50),
     deps.agenda.forDay(userId, settings.timezone, localDate),
+    deps.life ? deps.life.renderForModel(userId, localDate) : Promise.resolve(""),
   ]);
-  return { localDate, goals, tasks, pendingSuggestions: pending.length, agenda };
+  return { localDate, goals, tasks, pendingSuggestions: pending.length, agenda, life };
 }
 
 /** Compact text for the model. Kept short: it is sent with every message. */
@@ -48,6 +52,7 @@ export function renderState(s: StateSnapshot, tz: string, name = "Oliver"): stri
     );
   } else parts.push("Open tasks: none.");
   parts.push(renderAgenda(s.agenda, tz));
+  if (s.life) parts.push(s.life);
   if (s.pendingSuggestions) parts.push(`Suggestions waiting in ${name}'s inbox: ${s.pendingSuggestions}.`);
   return parts.join("\n\n");
 }

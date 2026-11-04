@@ -18,5 +18,7 @@ export const Icon = {
   stop: (p: SVGProps<SVGSVGElement>) => (<svg {...base} {...p}><rect x="6" y="6" width="12" height="12" rx="2" /></svg>),
   plus: (p: SVGProps<SVGSVGElement>) => (<svg {...base} {...p}><path d="M12 5v14M5 12h14" /></svg>),
   list: (p: SVGProps<SVGSVGElement>) => (<svg {...base} {...p}><path d="M4 6h16M4 12h16M4 18h10" /></svg>),
+  life: (p: SVGProps<SVGSVGElement>) => (<svg {...base} {...p}><path d="M3 12h4l2-5 4 10 2-5h6" /></svg>),
+  book: (p: SVGProps<SVGSVGElement>) => (<svg {...base} {...p}><path d="M6 3h11a2 2 0 012 2v16H7a2 2 0 01-2-2V4a1 1 0 011-1z" /><path d="M9 8h7M9 12h5" /></svg>),
   x: (p: SVGProps<SVGSVGElement>) => (<svg {...base} {...p}><path d="M6 6l12 12M18 6L6 18" /></svg>),
 };

@@ -10,6 +10,7 @@ const NAV = [
   { href: "/", label: "Command Center", short: "Home", icon: Icon.home, mobile: true },
   { href: "/chat", label: "Conversation", short: "Chat", icon: Icon.chat, mobile: true },
   { href: "/planning", label: "Goals & Tasks", short: "Plan", icon: Icon.check, mobile: true },
+  { href: "/life", label: "Life", short: "Life", icon: Icon.life, mobile: true },
   { href: "/memory", label: "Memory Vault", short: "Memory", icon: Icon.brain, mobile: true },
   { href: "/files", label: "Files", short: "Files", icon: Icon.files, mobile: false },
   { href: "/usage", label: "Usage & Budget", short: "Usage", icon: Icon.chart, mobile: false },

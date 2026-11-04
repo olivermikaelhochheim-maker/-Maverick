@@ -23,14 +23,17 @@ export default async function CommandCenter() {
   const settings = await getSettings(m.db, m.cipher, user.id);
   const tz = settings.timezone;
   const local = localParts(tz);
-  const [spend, tasks, goals, suggestions, agenda, briefings] = await Promise.all([
+  const [spend, tasks, goals, suggestions, agenda, briefings, life] = await Promise.all([
     getSpend(m.db, user.id, settings),
     m.deps.planning.listTasks(user.id, { limit: 5 }),
     m.deps.planning.listGoals(user.id, { activeOnly: true }),
     m.deps.suggestions.list(user.id, "pending"),
     m.deps.agenda.forDay(user.id, tz, local.date),
     m.briefings.latest(user.id, 3),
+    m.deps.life!.overview(user.id, local.date),
   ]);
+  const habitTitle = new Map(life.habits.map((h) => [h.id, h.title]));
+  const openHabits = life.day.rows.filter((r) => r.status === "unlogged").map((r) => habitTitle.get(r.habitId));
   const today = new Intl.DateTimeFormat("en-GB", { timeZone: tz, weekday: "long", day: "numeric", month: "long" }).format(new Date());
   const todaysBriefing = briefings.find((b) => b.kind === "morning" && b.localDate === local.date);
 
@@ -113,6 +116,33 @@ export default async function CommandCenter() {
           <h3 id="h-prio">Top priorities</h3>
           <TaskQuickList initial={tasks} today={local.date} />
           <p className="small" style={{ marginBottom: 0 }}><Link href="/planning">All goals &amp; tasks</Link></p>
+        </section>
+
+        <section className="card span-12" aria-labelledby="h-life">
+          <h3 id="h-life">Life today</h3>
+          {life.habits.length ? (
+            <p style={{ marginBottom: "0.4rem" }}>
+              {life.day.scheduled ? (
+                <>
+                  <strong>{life.day.pct}%</strong> of today&apos;s habits ({life.day.done} of {life.day.scheduled})
+                </>
+              ) : (
+                "No day-habits scheduled today"
+              )}
+              {" · "}
+              {life.week.total.scheduled ? (
+                <>
+                  week so far <strong>{life.week.total.pct}%</strong> ({life.week.total.done} of {life.week.total.scheduled})
+                </>
+              ) : (
+                "nothing scheduled this week"
+              )}
+              {openHabits.length > 0 && <span className="muted"> · Not logged yet: {openHabits.join(", ")}</span>}
+            </p>
+          ) : (
+            <p className="empty">No habits yet. Add a few, or import your Daybook data.</p>
+          )}
+          <p className="small" style={{ marginBottom: 0 }}><Link href="/life">Open Life</Link> · <Link href="/life/journal?new=1">Write today&apos;s entry</Link></p>
         </section>
 
         <section className="card span-8" aria-labelledby="h-inbox">
