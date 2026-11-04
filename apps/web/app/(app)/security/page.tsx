@@ -44,6 +44,8 @@ const ACTION_LABELS: Record<string, string> = {
   "two_factor.disabled": "Two-step login turned off",
   "two_factor.recovery_codes_regenerated": "New recovery codes generated",
   "data.imported": "Data imported",
+  "file.uploaded": "File uploaded",
+  "file.deleted": "File deleted",
   "login.failed": "Failed sign-in attempt",
   "login.locked": "Sign-in temporarily locked (too many failures)",
   logout: "Signed out",

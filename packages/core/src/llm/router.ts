@@ -19,7 +19,7 @@ const COMPLEX = /\b(strateg|plan|analy[sz]|decid|decision|pricing|price|revenue|
 export function routeMessage(
   text: string,
   settings: Settings,
-  opts: { deep?: boolean; softLimitReached?: boolean } = {},
+  opts: { deep?: boolean; softLimitReached?: boolean; hasFiles?: boolean } = {},
 ): RouteDecision {
   const models = settings.routing.models;
   let tier: Tier;
@@ -32,6 +32,9 @@ export function routeMessage(
   } else if (mode !== "auto") {
     tier = mode;
     reason = `Settings fix the model tier to ${mode}`;
+  } else if (opts.hasFiles) {
+    tier = "standard";
+    reason = "Files in the conversation, so the standard model";
   } else if (text.length > 600) {
     tier = "standard";
     reason = "Long message, so the standard model";

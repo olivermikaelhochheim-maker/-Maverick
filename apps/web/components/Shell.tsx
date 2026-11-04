@@ -11,6 +11,7 @@ const NAV = [
   { href: "/chat", label: "Conversation", short: "Chat", icon: Icon.chat, mobile: true },
   { href: "/planning", label: "Goals & Tasks", short: "Plan", icon: Icon.check, mobile: true },
   { href: "/memory", label: "Memory Vault", short: "Memory", icon: Icon.brain, mobile: true },
+  { href: "/files", label: "Files", short: "Files", icon: Icon.files, mobile: false },
   { href: "/usage", label: "Usage & Budget", short: "Usage", icon: Icon.chart, mobile: false },
   { href: "/security", label: "Security", short: "Security", icon: Icon.shield, mobile: false },
   { href: "/settings", label: "Settings", short: "More", icon: Icon.gear, mobile: true },
@@ -64,7 +65,7 @@ export function Shell({ children, mode }: { children: ReactNode; mode: "live" | 
           <Link
             key={n.href}
             href={n.href}
-            aria-current={isActive(pathname, n.href) || (n.href === "/settings" && ["/usage", "/security"].some((p) => isActive(pathname, p))) ? "page" : undefined}
+            aria-current={isActive(pathname, n.href) || (n.href === "/settings" && ["/usage", "/security", "/files"].some((p) => isActive(pathname, p))) ? "page" : undefined}
           >
             <n.icon /> {n.short}
           </Link>

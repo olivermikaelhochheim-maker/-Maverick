@@ -10,10 +10,13 @@ export async function POST(req: Request) {
   let body;
   try {
     ctx = await apiUser(req);
-    body = await readJson<{ text?: unknown; conversationId?: unknown; deep?: unknown; voice?: unknown }>(req, 100_000);
+    body = await readJson<{ text?: unknown; conversationId?: unknown; deep?: unknown; voice?: unknown; fileIds?: unknown }>(req, 100_000);
     if (typeof body.text !== "string") throw new UserFacingError("Message text is required.", "bad_request");
     if (body.conversationId !== undefined && typeof body.conversationId !== "string") {
       throw new UserFacingError("Invalid conversation.", "bad_request");
+    }
+    if (body.fileIds !== undefined && (!Array.isArray(body.fileIds) || !body.fileIds.every((x) => typeof x === "string"))) {
+      throw new UserFacingError("Invalid attachments.", "bad_request");
     }
   } catch (err) {
     return errorResponse(err);
@@ -28,6 +31,7 @@ export async function POST(req: Request) {
     conversationId: (body.conversationId as string | undefined) || undefined,
     deep: body.deep === true,
     voice: body.voice === true,
+    fileIds: (body.fileIds as string[] | undefined) ?? undefined,
     signal: abort.signal,
   });
 

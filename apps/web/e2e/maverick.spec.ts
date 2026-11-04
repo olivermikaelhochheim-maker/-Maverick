@@ -1,4 +1,8 @@
 import { createHmac } from "node:crypto";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const FIXTURES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../packages/core/test/fixtures");
 import { expect, test, type Page } from "@playwright/test";
 
 /** RFC 6238 code, so tests can act as Oliver's authenticator app. */
@@ -157,7 +161,7 @@ test.describe.serial("Maverick", () => {
 
   test("every page fits the screen without sideways scrolling", async ({ page }) => {
     await ensureAccount(page);
-    for (const p of ["/", "/chat", "/planning", "/memory", "/usage", "/security", "/settings"]) {
+    for (const p of ["/", "/chat", "/planning", "/memory", "/files", "/usage", "/security", "/settings"]) {
       await page.goto(p);
       await noHorizontalScroll(page);
     }
@@ -290,6 +294,48 @@ test.describe.serial("Maverick", () => {
     expect(spoken).toContain("I've suggested that.");
     expect(spoken).not.toMatch(/[_*#`]/); // markdown stripped before speaking
     expect(await page.evaluate(() => (window as unknown as { __recLang: string }).__recLang)).toBe("en-GB");
+  });
+
+  test("files: attach a PDF in chat, Maverick sees it, chips persist and download works", async ({ page }) => {
+    await ensureAccount(page);
+    await page.goto("/chat");
+    await page.locator('input[type="file"]').setInputFiles(path.join(FIXTURES, "contract.pdf"));
+    const chip = page.locator(".file-chip.pending", { hasText: "contract.pdf" });
+    await expect(chip).toContainText("2 p · ~4k tokens");
+    await page.getByLabel("Message Maverick").fill("What is my notice period?");
+    await page.getByLabel("Send").click();
+    await expect(page.locator(".msg-assistant").last()).toContainText("I can see 1 file in this conversation: contract.pdf (pdf)", { timeout: 20_000 });
+    await expect(page.locator(".msg-meta").last()).toContainText("Files in the conversation");
+    // Follow-up: still in view without re-attaching.
+    await page.getByLabel("Message Maverick").fill("And the salary?");
+    await page.getByLabel("Message Maverick").press("Enter");
+    await expect(page.locator(".msg-assistant").last()).toContainText("contract.pdf", { timeout: 20_000 });
+    await page.reload();
+    const sent = page.locator(".msg-user .file-chip", { hasText: "contract.pdf" });
+    await expect(sent).toHaveCount(1);
+    const [download] = await Promise.all([page.waitForEvent("download"), sent.click()]);
+    expect(download.suggestedFilename()).toBe("contract.pdf");
+  });
+
+  test("files: library upload, Ask Maverick, rejection of unsupported files, delete", async ({ page }) => {
+    await ensureAccount(page);
+    await page.goto("/files");
+    await page.getByLabel("Upload files").setInputFiles([path.join(FIXTURES, "plan.docx"), path.join(FIXTURES, "pixel.png")]);
+    await expect(page.getByRole("cell", { name: /plan\.docx/ }).first()).toBeVisible();
+    await expect(page.locator("img.thumb").first()).toBeVisible();
+    await page.getByLabel("Upload files").setInputFiles({ name: "virus.exe", mimeType: "application/octet-stream", buffer: Buffer.from("MZ\x00\x00binary") });
+    await expect(page.locator(".alert-error")).toContainText("Unsupported file type");
+
+    await page.locator("tr", { hasText: "plan.docx" }).first().getByRole("link", { name: "Ask Maverick" }).click();
+    await expect(page.locator(".file-chip.pending", { hasText: "plan.docx" })).toBeVisible();
+    await page.getByLabel("Send").click(); // allowed with only a file attached
+    await expect(page.locator(".msg-assistant").last()).toContainText('plan.docx (text, starts "Zorza Marketing plan', { timeout: 20_000 });
+
+    await page.goto("/files");
+    const before = await page.locator("tr", { hasText: "pixel.png" }).count();
+    page.once("dialog", (d) => d.accept());
+    await page.locator("tr", { hasText: "pixel.png" }).first().getByRole("button", { name: /Delete/ }).click();
+    await expect(page.locator("tr", { hasText: "pixel.png" })).toHaveCount(before - 1);
   });
 
   test("Memory Vault: paste many at once", async ({ page }) => {

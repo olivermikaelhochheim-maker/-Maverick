@@ -17,6 +17,15 @@ export interface ToolDef {
   run(input: Record<string, unknown>): Promise<{ ok: boolean; content: string }>;
 }
 
+/** A file shown to the model alongside the conversation. Contents are untrusted data. */
+export interface ChatDocument {
+  name: string;
+  kind: "pdf" | "image" | "text";
+  mediaType: string;
+  /** base64 for pdf/image; plain text for text */
+  data: string;
+}
+
 export interface ChatRequest {
   model: string;
   system: string;
@@ -30,6 +39,8 @@ export interface ChatRequest {
   effort?: "low" | "medium" | "high";
   signal?: AbortSignal;
   tools?: ToolDef[];
+  /** Files in this conversation; placed before the first message of the window. */
+  documents?: ChatDocument[];
   /** Max tool-use round trips per request (each is another model call). Default 2. */
   maxToolRounds?: number;
 }

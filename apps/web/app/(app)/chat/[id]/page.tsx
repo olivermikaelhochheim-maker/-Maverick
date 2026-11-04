@@ -15,6 +15,7 @@ export default async function ChatPage({ params }: { params: Promise<{ id: strin
     throw err;
   }
   const conversations = await m.chat.conversations.list(user.id, 100);
+  const filesByMessage = await m.deps.files.byMessage(user.id, id);
   // Re-attach each suggestion to the reply it came from: the first assistant message saved after it.
   const suggestions = await m.deps.suggestions.forConversation(user.id, id);
   const byMessage = new Map<string, { id: string; kind: string; title: string; decided?: "accepted" | "dismissed" }[]>();
@@ -39,6 +40,7 @@ export default async function ChatPage({ params }: { params: Promise<{ id: strin
         costUsd: x.costUsd,
         latencyMs: x.latencyMs,
         suggestions: byMessage.get(x.id),
+        files: filesByMessage.get(x.id)?.map((f) => ({ id: f.id, name: f.name, kind: f.kind })),
       }))}
       mode={m.providers.mode}
     />

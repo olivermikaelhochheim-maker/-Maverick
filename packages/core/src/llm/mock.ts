@@ -33,7 +33,11 @@ export class MockProvider implements LLMProvider {
         return;
       }
     }
-    const reply = mockReply(last);
+    const reply = req.documents?.length
+      ? `I can see ${req.documents.length} file${req.documents.length === 1 ? "" : "s"} in this conversation: ${req.documents
+          .map((d) => `${d.name} (${d.kind}${d.kind === "text" ? `, starts "${d.data.slice(0, 40).replace(/\s+/g, " ")}"` : ""})`)
+          .join("; ")}. In live mode I'd read them and answer your question.${MOCK_NOTE}`
+      : mockReply(last);
     const delay = this.opts.delayMs ?? 15;
     const words = reply.split(/(\s+)/);
     let out = 0;

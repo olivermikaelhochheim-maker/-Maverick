@@ -24,6 +24,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <LogoutButton />
       </div>
       <nav className="settings-links mobile-only" aria-label="More">
+        <Link className="btn btn-sm" href="/files">Files</Link>
         <Link className="btn btn-sm" href="/usage">Usage &amp; budget</Link>
         <Link className="btn btn-sm" href="/security">Security &amp; audit log</Link>
       </nav>

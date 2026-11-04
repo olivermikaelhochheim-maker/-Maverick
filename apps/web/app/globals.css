@@ -308,3 +308,29 @@ input[type="range"] { padding: 0; border: 0; background: none; min-height: 32px;
 .qr-box img { display: block; }
 .setup-key { word-break: break-all; letter-spacing: 0.05em; }
 .recovery-codes { font-size: 1rem; line-height: 1.8; columns: 2; text-align: center; }
+
+/* ---------- Files ---------- */
+.file-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.5rem; }
+.file-chips.in-msg { margin-bottom: 0.4rem; }
+.file-chip { display: inline-flex; align-items: center; gap: 0.35rem; max-width: 100%; font-size: 0.82rem; padding: 0.25rem 0.55rem; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--panel); color: var(--text); }
+.file-chip:hover { text-decoration: none; border-color: #3a4f72; }
+.file-chip .fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+.file-chip.error { border-color: #5a2a33; }
+.file-chip .err { color: var(--danger); white-space: normal; }
+.chip-x { background: none; border: 0; color: var(--faint); cursor: pointer; font: inherit; padding: 0 0.15rem; min-height: 0; }
+.chip-x:hover { color: var(--text); }
+.chat-main { position: relative; }
+.chat-main.dragging::after { content: ""; position: absolute; inset: 0; border: 2px dashed var(--accent); border-radius: 12px; background: #3fd8ea10; pointer-events: none; z-index: 5; }
+.drop-hint { position: absolute; top: 45%; left: 0; right: 0; text-align: center; color: var(--accent); font-weight: 600; z-index: 6; pointer-events: none; }
+.files-table td { vertical-align: middle; }
+.thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); display: block; }
+.thumb-icon { width: 44px; height: 44px; display: grid; place-items: center; font-size: 1.4rem; border-radius: 6px; background: var(--panel); border: 1px solid var(--border); }
+.upload-zone { border: 2px dashed var(--border-strong); border-radius: var(--radius); padding: 1.4rem; text-align: center; color: var(--muted); }
+.upload-zone.dragging { border-color: var(--accent); color: var(--accent); background: #3fd8ea10; }
+.file-actions { display: flex; flex-wrap: wrap; gap: 0.3rem; justify-content: flex-end; }
+@media (max-width: 900px) {
+  .files-table tr { display: grid; grid-template-columns: 52px 1fr; gap: 0 0.6rem; border-bottom: 1px solid var(--border); padding: 0.4rem 0; }
+  .files-table td { border: 0; padding: 0.2rem 0; }
+  .files-table td:last-child { grid-column: 2; }
+  .file-actions { justify-content: flex-start; }
+}

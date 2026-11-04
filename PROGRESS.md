@@ -1,6 +1,6 @@
 # Maverick: progress log
 
-## Status: Milestone 4 (cloud-ready + two-step login) built and tested, including the real Docker image. Next: Oliver deploys to Render (docs/cloud.md).
+## Status: Milestone 5 (files) built and tested. Cloud deployment (Milestone 4) ready for Oliver to deploy.
 
 Last updated: 2026-10-24 · Code: https://github.com/olivermikaelhochheim-maker/-Maverick
 
@@ -46,12 +46,19 @@ Single-user auth, streaming chat, model routing (Haiku/Sonnet/Opus 5.5), hard bu
 - Guide: docs/cloud.md · ADR 0012
 - Verified: Docker image built and run like Render (custom port, root-owned disk, host-style key, 2FA required); scripted first-run + restart passed
 
+### Milestone 5: Files
+- Attach in chat (📎, drag and drop, paste screenshots, iPhone camera/Photos) or upload in **Files**; "Ask Maverick" starts a conversation about a file
+- PDFs (≤100 pages) and images sent natively to Claude; Word and text extracted; type detected from content; HEIC converted in the browser where possible; big photos shrunk before upload
+- Files stay in view for the whole conversation (cached, 120k-token cap); the standard model for file conversations; file tokens counted in the budget check
+- Encrypted storage, safe downloads, 300 MB cap, per-file token/page estimate shown before sending
+- ADR 0013
+
 ## Test results (2026-10-24, Linux cloud container)
 | Suite | Result |
 |---|---|
 | TypeScript typecheck (core + web) | ✅ pass |
-| Core unit + integration (Vitest, real embedded Postgres) | ✅ 120 / 120 |
-| Browser end-to-end (Playwright, production build; iPhone 15 + desktop) | ✅ 38 passed, 2 skipped by design |
+| Core unit + integration (Vitest, real embedded Postgres) | ✅ 130 / 130 |
+| Browser end-to-end (Playwright, production build; iPhone 15 + desktop) | ✅ 42 passed, 2 skipped by design |
 | Docker image smoke test (cloud configuration, restart) | ✅ 17 / 17 checks |
 
 New coverage: Oslo DST time maths and quiet hours across midnight; memory provenance, expiry, selection reasons and token cap; task ranking and reminders; accept/edit/dismiss semantics; proposal tool validation and limits; strict-schema compatibility; chat context (memories, goals, tasks, calendar) and tool events; Google token refresh, unselected calendars, declined events, revoked tokens, missing-scope refusal; push consent, quiet hours, daily cap, dead subscriptions, endpoint allowlist; briefing template vs. model, budget fallback, once-per-day scheduling, catch-up, opt-out; export.
@@ -80,6 +87,9 @@ pnpm check                 # health check
 pnpm test                  # unit/integration tests
 pnpm test:e2e              # browser tests (after pnpm build)
 ```
+
+## ⚠️ Not yet verified: files with the live model
+Claude's handling of the PDF/image/text blocks is per the official SDK types and docs, but no real request has been made with a file yet (mock mode in tests).
 
 ## ⚠️ Not yet verified: Render itself
 The blueprint's exact behaviour on Render (field names, generated-value format, disk ownership) can only be confirmed by deploying. The design tolerates the likely variations.

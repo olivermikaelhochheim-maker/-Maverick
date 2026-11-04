@@ -7,6 +7,7 @@ import { Icon } from "./Icons";
 import { Markdown } from "./Markdown";
 import { Orb } from "./Orb";
 import { Listener, Speaker, canListen, loadPrefs, resolveVoice, unlockSpeech, type VoicePrefs } from "@/lib/voice";
+import { ACCEPT, KIND_ICON, formatTokens, prepareFile, uploadFile, type UploadedFile } from "@/lib/upload";
 
 export interface UiMessage {
   id: string;
@@ -21,6 +22,8 @@ export interface UiMessage {
   suggestions?: { id: string; kind: string; title: string; decided?: "accepted" | "dismissed" }[];
   /** Spoken replies: time from Oliver finishing speaking (or sending) to Maverick's first spoken word. */
   voiceLatencyMs?: number;
+  /** Files attached to a user message */
+  files?: { id: string; name: string; kind: UploadedFile["kind"] }[];
   context?: { id: string; category: string; content: string; reason: string }[];
 }
 
@@ -64,6 +67,8 @@ export function ChatView(props: {
   conversationId?: string;
   initialMessages: UiMessage[];
   initialQuery?: string;
+  /** Files to start with attached (from "Ask Maverick about this" in Files) */
+  initialFiles?: UploadedFile[];
   mode: "live" | "mock";
 }) {
   const [conversations, setConversations] = useState(props.conversations);
@@ -71,6 +76,33 @@ export function ChatView(props: {
   const [messages, setMessages] = useState<UiMessage[]>(props.initialMessages);
   const [input, setInput] = useState("");
   const [deep, setDeep] = useState(false);
+
+  // ----- Attachments -----
+  type Pending = { key: string; name: string; status: "uploading" | "ready" | "error"; progress: number; file?: UploadedFile; error?: string };
+  const [attachments, setAttachments] = useState<Pending[]>(
+    (props.initialFiles ?? []).map((f) => ({ key: f.id, name: f.name, status: "ready", progress: 1, file: f })),
+  );
+  const [dragging, setDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploading = attachments.some((a) => a.status === "uploading");
+
+  const addFiles = async (list: FileList | File[]) => {
+    const files = Array.from(list);
+    const room = 5 - attachments.filter((a) => a.status !== "error").length;
+    if (files.length > room) setWarnings((w) => [...w, "You can attach up to 5 files per message."]);
+    for (const original of files.slice(0, Math.max(0, room))) {
+      const key = `${original.name}-${Date.now()}-${Math.random()}`;
+      setAttachments((as) => [...as, { key, name: original.name, status: "uploading", progress: 0 }]);
+      const patch = (p: Partial<Pending>) => setAttachments((as) => as.map((a) => (a.key === key ? { ...a, ...p } : a)));
+      try {
+        const prepared = await prepareFile(original);
+        const stored = await uploadFile(prepared, (f) => patch({ progress: f }));
+        patch({ status: "ready", progress: 1, file: stored, name: stored.name });
+      } catch (err) {
+        patch({ status: "error", error: (err as Error).message });
+      }
+    }
+  };
   const [busy, setBusy] = useState(false);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [spend, setSpend] = useState<{ monthUsd: number; monthHardUsd: number } | null>(null);
@@ -129,8 +161,10 @@ export function ChatView(props: {
 
   const send = useCallback(
     async (raw: string, opts: { voice?: boolean; spokenAt?: number } = {}) => {
-      const text = raw.trim();
-      if (!text || busy) return;
+      const ready = attachments.filter((a) => a.status === "ready" && a.file).map((a) => a.file!);
+      const text = raw.trim() || (ready.length ? "Please take a look at the attached file" + (ready.length > 1 ? "s." : ".") : "");
+      if (!text || busy || attachments.some((a) => a.status === "uploading")) return;
+      setAttachments([]);
       setInput("");
       setWarnings([]);
       setVoiceError(null);
@@ -144,7 +178,7 @@ export function ChatView(props: {
       // The reply's id changes from a temporary one to the saved one when it completes;
       // late callbacks (e.g. speech starting) must patch whichever id is current.
       const current = { id: asstId };
-      setMessages((ms) => [...ms, { id: userId, role: "user", content: text, status: "complete" }, { id: asstId, role: "assistant", content: "", status: "streaming" }]);
+      setMessages((ms) => [...ms, { id: userId, role: "user", content: text, status: "complete", files: ready.map((f) => ({ id: f.id, name: f.name, kind: f.kind })) }, { id: asstId, role: "assistant", content: "", status: "streaming" }]);
 
       const ctrl = new AbortController();
       abortRef.current = ctrl;
@@ -169,7 +203,7 @@ export function ChatView(props: {
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, conversationId, deep, voice: Boolean(opts.voice) }),
+          body: JSON.stringify({ text, conversationId, deep, voice: Boolean(opts.voice), fileIds: ready.map((f) => f.id) }),
           signal: ctrl.signal,
         });
         if (!res.ok || !res.body) {
@@ -235,7 +269,7 @@ export function ChatView(props: {
         inputRef.current?.focus();
       }
     },
-    [busy, conversationId, deep, refreshList, prefs],
+    [busy, conversationId, deep, refreshList, prefs, attachments],
   );
 
   // Push-to-talk: tap to start, tap again (or pause) to finish. Never listens in the background.
@@ -337,7 +371,26 @@ export function ChatView(props: {
         ))}
       </aside>
 
-      <section className="chat-main" aria-label="Conversation">
+      <section
+        className={`chat-main${dragging ? " dragging" : ""}`}
+        aria-label="Conversation"
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes("Files")) {
+            e.preventDefault();
+            setDragging(true);
+          }
+        }}
+        onDragLeave={(e) => {
+          if (e.currentTarget === e.target) setDragging(false);
+        }}
+        onDrop={(e) => {
+          if (!e.dataTransfer.files.length) return;
+          e.preventDefault();
+          setDragging(false);
+          void addFiles(e.dataTransfer.files);
+        }}
+      >
+        {dragging && <div className="drop-hint" aria-hidden>Drop files to share them with Maverick</div>}
         <header className="chat-top">
           <button className="btn btn-ghost btn-sm mobile-only" onClick={() => setListOpen(true)} aria-label="Show conversations">
             <Icon.list width={18} />
@@ -371,7 +424,18 @@ export function ChatView(props: {
             )}
             {messages.map((m) =>
               m.role === "user" ? (
-                <div key={m.id} className="msg msg-user">{m.content}</div>
+                <div key={m.id} className="msg msg-user">
+                  {m.files && m.files.length > 0 && (
+                    <div className="file-chips in-msg">
+                      {m.files.map((f) => (
+                        <a key={f.id} className="file-chip" href={`/api/files/${f.id}`} title={`Download ${f.name}`}>
+                          <span aria-hidden>{KIND_ICON[f.kind]}</span> <span className="fname">{f.name}</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                  {m.content}
+                </div>
               ) : (
                 <article key={m.id} className={`msg msg-assistant${m.status === "error" ? " msg-error" : ""}`}>
                   <div className="who">MAVERICK</div>
@@ -421,6 +485,29 @@ export function ChatView(props: {
                 <button type="button" className="btn btn-sm btn-ghost" onClick={stopSpeaking}>Stop speaking</button>
               </div>
             )}
+            {attachments.length > 0 && (
+              <div className="file-chips" aria-label="Attachments">
+                {attachments.map((a) => (
+                  <span key={a.key} className={`file-chip pending ${a.status}`} title={a.error ?? a.name}>
+                    <span aria-hidden>{a.file ? KIND_ICON[a.file.kind] : "📎"}</span>
+                    <span className="fname">{a.name}</span>
+                    {a.status === "uploading" && <span className="faint">{Math.round(a.progress * 100)}%</span>}
+                    {a.status === "ready" && a.file && (
+                      <span className="faint" title="Approximate size for the model">{a.file.pages ? `${a.file.pages} p · ` : ""}{formatTokens(a.file.tokenEstimate)}</span>
+                    )}
+                    {a.status === "error" && <span className="err">{a.error}</span>}
+                    <button
+                      type="button"
+                      className="chip-x"
+                      aria-label={`Remove ${a.name}`}
+                      onClick={() => setAttachments((as) => as.filter((x) => x.key !== a.key))}
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
             <form
               className="composer-box"
               onSubmit={(e) => {
@@ -441,9 +528,32 @@ export function ChatView(props: {
                   e.target.style.height = `${Math.min(e.target.scrollHeight, 320)}px`;
                 }}
                 onKeyDown={onKeyDown}
+                onPaste={(e) => {
+                  const files = Array.from(e.clipboardData.files);
+                  if (files.length) {
+                    e.preventDefault();
+                    void addFiles(files);
+                  }
+                }}
                 maxLength={20000}
                 autoFocus
               />
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept={ACCEPT}
+                className="sr-only"
+                tabIndex={-1}
+                aria-hidden
+                onChange={(e) => {
+                  if (e.target.files?.length) void addFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              <button type="button" className="btn attach-btn" onClick={() => fileInputRef.current?.click()} aria-label="Attach files" title="Attach files (PDF, images, Word, text)" disabled={busy}>
+                <Icon.clip width={18} />
+              </button>
               {micAvailable && (
                 <button
                   type="button"
@@ -462,7 +572,7 @@ export function ChatView(props: {
                   <Icon.stop width={18} />
                 </button>
               ) : (
-                <button type="submit" className="btn btn-primary" disabled={!input.trim()} aria-label="Send">
+                <button type="submit" className="btn btn-primary" disabled={(!input.trim() && !attachments.some((a) => a.status === "ready")) || uploading} aria-label="Send">
                   <Icon.send width={18} />
                 </button>
               )}

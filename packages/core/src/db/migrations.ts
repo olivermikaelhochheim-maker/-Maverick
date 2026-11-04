@@ -251,6 +251,35 @@ export const MIGRATIONS: { id: string; sql: string }[] = [
       );
     `,
   },
+  {
+    id: "0004_files",
+    sql: `
+      -- Files Oliver gives Maverick. The original bytes and any extracted text are encrypted.
+      CREATE TABLE files (
+        id             TEXT PRIMARY KEY,
+        user_id        TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name_enc       TEXT NOT NULL,
+        kind           TEXT NOT NULL CHECK (kind IN ('pdf', 'image', 'text', 'docx')),
+        media_type     TEXT NOT NULL,
+        size_bytes     INTEGER NOT NULL,
+        sha256         TEXT NOT NULL,
+        pages          INTEGER,
+        token_estimate INTEGER NOT NULL,
+        content_enc    BYTEA NOT NULL,
+        text_enc       TEXT,
+        created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      CREATE INDEX files_user_idx ON files(user_id, created_at DESC);
+
+      -- Which files were attached to which message.
+      CREATE TABLE message_files (
+        message_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+        file_id    TEXT NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+        PRIMARY KEY (message_id, file_id)
+      );
+      CREATE INDEX message_files_file_idx ON message_files(file_id);
+    `,
+  },
 ];
 
 export async function migrate(db: Db): Promise<string[]> {

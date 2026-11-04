@@ -30,6 +30,21 @@ export class FieldCipher {
     return `v1:${iv.toString("base64")}:${tag.toString("base64")}:${ct.toString("base64")}`;
   }
 
+  /** Binary variant for files: iv(12) | tag(16) | ciphertext. */
+  encryptBytes(data: Buffer): Buffer {
+    const iv = randomBytes(12);
+    const c = createCipheriv("aes-256-gcm", this.key, iv);
+    const ct = Buffer.concat([c.update(data), c.final()]);
+    return Buffer.concat([iv, c.getAuthTag(), ct]);
+  }
+
+  decryptBytes(payload: Buffer): Buffer {
+    if (payload.length < 28) throw new Error("Ciphertext too short");
+    const d = createDecipheriv("aes-256-gcm", this.key, payload.subarray(0, 12));
+    d.setAuthTag(payload.subarray(12, 28));
+    return Buffer.concat([d.update(payload.subarray(28)), d.final()]);
+  }
+
   decrypt(payload: string): string {
     const parts = payload.split(":");
     if (parts.length !== 4 || parts[0] !== "v1") throw new Error("Unrecognised ciphertext format");

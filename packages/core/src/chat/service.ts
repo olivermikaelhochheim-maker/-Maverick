@@ -14,6 +14,7 @@ import { SuggestionStore } from "../suggestions";
 import { AgendaService } from "../integrations/calendar";
 import { IntegrationStore } from "../integrations/store";
 import { renderState, snapshot } from "../context";
+import { FileStore } from "../files";
 import { BudgetExceededError, UserFacingError } from "../util/errors";
 import { formatLocalNow } from "../util/time";
 import { log } from "../util/logger";
@@ -27,6 +28,8 @@ export const VOICE_STYLE =
   "Oliver is talking to you by voice and your reply will be spoken aloud. Answer like a composed person speaking: short sentences, usually under 80 words, no lists, headings, tables, links or emoji. Offer more detail only if he asks.";
 /** Tool round trips allowed per reply (each is another model call). */
 export const MAX_TOOL_ROUNDS = 2;
+/** Most file tokens kept "on the table" in one conversation (~60 PDF pages). */
+export const FILE_TOKEN_BUDGET = 120_000;
 
 export interface ContextItem {
   id: string;
@@ -46,6 +49,10 @@ export type ChatStreamEvent =
       mode: "live" | "mock";
       warnings: string[];
       context: ContextItem[];
+      /** Files attached to this message */
+      files: { id: string; name: string; kind: string }[];
+      /** All files the model can see in this conversation */
+      filesInView: string[];
     }
   | { type: "delta"; text: string }
   | { type: "suggestion"; id: string; kind: string; title: string }
@@ -64,6 +71,7 @@ export type ChatStreamEvent =
 export const EFFORT: Record<Tier, "low" | "medium" | "high"> = { fast: "low", standard: "medium", deep: "high" };
 
 export interface ChatDeps {
+  files: FileStore;
   memory: MemoryStore;
   planning: PlanningStore;
   suggestions: SuggestionStore;
@@ -74,6 +82,7 @@ export function defaultDeps(db: Db, cipher: FieldCipher): ChatDeps {
   const memory = new MemoryStore(db, cipher);
   const planning = new PlanningStore(db, cipher);
   return {
+    files: new FileStore(db, cipher),
     memory,
     planning,
     suggestions: new SuggestionStore(db, cipher, memory, planning),
@@ -117,6 +126,8 @@ export class ChatService {
     deep?: boolean;
     /** Oliver spoke this message; the reply will be read aloud. */
     voice?: boolean;
+    /** Files (already uploaded) to attach to this message. */
+    fileIds?: string[];
     signal?: AbortSignal;
   }): AsyncGenerator<ChatStreamEvent> {
     const text = input.text.trim();
@@ -129,7 +140,16 @@ export class ChatService {
     const settings = await getSettings(this.db, this.cipher, user.id);
     const spendBefore = await getSpend(this.db, user.id, settings);
 
-    const route = routeMessage(text, settings, { deep: input.deep, softLimitReached: spendBefore.softLimitReached });
+    // Files: newly attached ones (ownership checked) plus those already in the conversation.
+    const newFiles = input.fileIds?.length ? await this.deps.files.assertOwned(user.id, input.fileIds) : [];
+    if (input.conversationId) await this.conversations.assertOwner(user.id, input.conversationId);
+    const fileView = await this.deps.files.documentsFor(user.id, input.conversationId, newFiles, FILE_TOKEN_BUDGET);
+
+    const route = routeMessage(text, settings, {
+      deep: input.deep,
+      softLimitReached: spendBefore.softLimitReached,
+      hasFiles: fileView.docs.length > 0,
+    });
     const live = this.providers.mode === "live";
     const model = live ? route.model : "mock-maverick";
     const provider = live ? this.providers.primary : this.providers.mock;
@@ -166,7 +186,11 @@ export class ChatService {
       .join("\n\n");
     const turns = windowHistory([...history, { role: "user" as const, content: text }], settings.routing.historyTokenBudget, estimateTokens);
     if (turns[0]?.role === "assistant") turns.unshift({ role: "user", content: SYSTEM_OPENED_TURN });
-    const estInput = estimateTokens(system) + estimateTokens(turnContext) + turns.reduce((n, t) => n + estimateTokens(t.content), 0) + 900; // + tool schemas
+    const estInput =
+      estimateTokens(system) + estimateTokens(turnContext) + turns.reduce((n, t) => n + estimateTokens(t.content), 0) + 900 /* tool schemas */ + fileView.tokens;
+    if (fileView.dropped.length) {
+      warnings.push(`Too many files to keep in view at once; not showing Maverick: ${fileView.dropped.map((f) => f.name).join(", ")}. Start a new conversation for those.`);
+    }
 
     const useTools = settings.proactive.suggestFromChat;
     let plan;
@@ -185,6 +209,7 @@ export class ChatService {
 
     if (!conversationId) conversationId = await this.conversations.create(user.id, titleFrom(text));
     const userMessageId = await this.conversations.addMessage(conversationId, { role: "user", content: text });
+    if (newFiles.length) await this.deps.files.attach(userMessageId, newFiles.map((f) => f.id));
 
     yield {
       type: "meta",
@@ -196,6 +221,8 @@ export class ChatService {
       mode: this.providers.mode,
       warnings,
       context: selected.map((s) => ({ id: s.memory.id, category: s.memory.category, content: s.memory.content, reason: s.reason })),
+      files: newFiles.map((f) => ({ id: f.id, name: f.name, kind: f.kind })),
+      filesInView: fileView.files.map((f) => f.name),
     };
 
     // Proposals made by tools are queued here and surfaced as events in stream order.
@@ -220,6 +247,7 @@ export class ChatService {
         signal: input.signal,
         tools,
         maxToolRounds: MAX_TOOL_ROUNDS,
+        documents: fileView.docs.map((d) => ({ name: d.name, kind: d.kind, mediaType: d.mediaType, data: d.data })),
       })) {
         if (ev.type === "text") {
           reply += ev.text;

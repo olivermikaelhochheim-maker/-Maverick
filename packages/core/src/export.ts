@@ -25,6 +25,8 @@ export async function exportAll(db: Db, cipher: FieldCipher, deps: ChatDeps, use
     suggestions: await deps.suggestions.list(user.id, "all", 100_000),
     conversations: withMessages,
     usage: usage.rows,
+    // File contents aren't included (they can be large); download them from Files.
+    files: (await deps.files.list(user.id)).map((f) => ({ name: f.name, kind: f.kind, sizeBytes: f.sizeBytes, pages: f.pages, createdAt: f.createdAt })),
     auditLog: await listAudit(db, user.id, 500),
   };
 }

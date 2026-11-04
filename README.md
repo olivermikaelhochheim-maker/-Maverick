@@ -125,6 +125,16 @@ The first time, the browser asks for microphone permission. Allow it. Use **Safa
 
 ---
 
+## Give Maverick files
+
+- **In a conversation:** tap **📎** (or drag files onto the chat, or paste a screenshot), then ask. On iPhone you can pick from Photos or take a picture of a document.
+- **Files library:** sidebar → **Files** (on iPhone: More → Files). Upload, then **Ask Maverick** next to a file to start a conversation about it.
+- Works with **PDFs** (up to 100 pages), **photos and screenshots**, **Word (.docx)**, and **text, Markdown, CSV and JSON**. Up to 10 MB each, 5 per message.
+- Once attached, Maverick keeps the file in view for the rest of that conversation, so ask follow-ups freely. Each chip shows roughly how big the file is for the model (e.g. "2 p · ~4k tokens").
+- Files are stored encrypted. Maverick only reads a file in conversations where you attach it. Ask "remember the key points" and Maverick will suggest memories from it for your approval.
+
+---
+
 ## Connect Google Calendar (read-only, about 20 minutes, once)
 
 Google requires every app, even a private one, to have its own sign-in credentials. Maverick asks only for **read-only** calendar access.
