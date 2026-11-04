@@ -122,12 +122,70 @@ test.describe.serial("Maverick", () => {
       .toBe(1);
   });
 
-  test("quick ask from the Command Center opens a chat", async ({ page }) => {
+  test("command palette: ask, add a task with smart parsing, remember, navigate", async ({ page }) => {
+    await ensureAccount(page);
+    const tag = test.info().project.name;
+    await page.goto("/");
+    await page.getByRole("button", { name: /Ask or do anything/ }).click();
+    const box = page.getByLabel("Command", { exact: true });
+    await box.fill("How should I think about Zorza revenue?");
+    await box.press("Enter"); // first item: Ask Maverick
+    await expect(page.locator(".msg-assistant").last()).toContainText("actual baselines", { timeout: 20_000 });
+
+    await page.keyboard.press("ControlOrMeta+k");
+    await page.getByLabel("Command", { exact: true }).fill(`Book flight medical ${tag} friday !1`);
+    await page.getByRole("option", { name: /Add task:/ }).click();
+    await expect(page.locator(".toast").last()).toContainText(`Task added: Book flight medical ${tag}`);
+    await expect(page.locator(".toast").last()).toContainText("High priority");
+
+    await page.keyboard.press("ControlOrMeta+k");
+    await page.getByLabel("Command", { exact: true }).fill(`I prefer morning workouts ${tag}`);
+    await page.getByRole("option", { name: /Remember:/ }).click();
+    await expect(page.locator(".toast").last()).toContainText("Saved to your Memory Vault");
+
+    await page.keyboard.press("ControlOrMeta+k");
+    await page.getByLabel("Command", { exact: true }).fill("memory");
+    await page.getByRole("option", { name: "Memory Vault" }).click();
+    await page.waitForURL(/\/memory/);
+    await expect(page.getByText(`I prefer morning workouts ${tag}`)).toBeVisible();
+  });
+
+  test("Command Center: stats, insights, focus timer and quick add", async ({ page }) => {
     await ensureAccount(page);
     await page.goto("/");
-    await page.getByLabel("Ask Maverick").fill("How should I think about Zorza revenue?");
-    await page.getByRole("button", { name: "Ask" }).click();
-    await expect(page.locator(".msg-assistant").last()).toContainText("actual baselines", { timeout: 20_000 });
+    await expect(page.getByText("Tasks done · 7 days")).toBeVisible();
+    await expect(page.getByText("Focus time · 7 days")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Maverick noticed" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Tasks completed per day" })).toBeVisible();
+
+    // Quick add shows what it understood before saving.
+    const qa = page.getByLabel("Quick add a task");
+    await qa.fill(`Revise statistics ${test.info().project.name} tomorrow 08:00 !1`);
+    await expect(page.locator(".qa-chip")).toHaveText(["Due tomorrow", "Reminder 08:00", "High priority"]);
+    await qa.press("Enter");
+    await expect(page.locator(".toast").last()).toContainText("Added");
+
+    // Focus: start, see it running, finish.
+    if (await page.getByRole("button", { name: "Done" }).isVisible()) await page.getByRole("button", { name: "Done" }).click();
+    await page.getByRole("button", { name: "15m" }).click();
+    await page.getByRole("button", { name: "Start focus" }).click();
+    await expect(page.locator(".focus-time")).toHaveText(/1[45]:\d\d/);
+    await expect(page.getByText("LEFT", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Done" }).click();
+    await expect(page.locator(".toast").last()).toContainText("focused minute");
+  });
+
+  test("Goals & tasks are grouped by when they're due", async ({ page }) => {
+    await ensureAccount(page);
+    await page.goto("/planning");
+    const tag = test.info().project.name;
+    await page.getByLabel("Quick add a task").fill(`Old report ${tag} 01.01.2026`);
+    await page.getByLabel("Quick add a task").press("Enter");
+    await expect(page.locator(".group-head.overdue")).toBeVisible();
+    const row = page.locator(".task-row", { hasText: `Old report ${tag}` });
+    await row.getByRole("button", { name: "→ today" }).click();
+    await expect(page.locator(".group-head.today")).toBeVisible();
+    await expect(page.locator(".task-row", { hasText: `Old report ${tag}` }).locator(".hint")).toContainText("today");
   });
 
   test("settings save and validate", async ({ page }) => {
@@ -162,7 +220,9 @@ test.describe.serial("Maverick", () => {
   test("every page fits the screen without sideways scrolling", async ({ page }) => {
     await ensureAccount(page);
     for (const p of ["/", "/chat", "/planning", "/memory", "/files", "/usage", "/security", "/settings"]) {
-      await page.goto(p);
+      const res = await page.goto(p);
+      expect(res?.status(), `${p} should load without a server error`).toBeLessThan(400);
+      await expect(page.getByText(/Application error|Internal Server Error/)).toHaveCount(0);
       await noHorizontalScroll(page);
     }
   });
@@ -348,12 +408,12 @@ test.describe.serial("Maverick", () => {
     );
     await page.getByLabel("Category for all of these").selectOption("profile");
     await page.getByRole("button", { name: "Add 3 memories" }).click();
-    await expect(page.locator("[role=status]")).toContainText("Added 3 memories");
+    await expect(page.locator(".alert[role=status]")).toContainText("Added 3 memories");
     await expect(page.locator(".mem-item", { hasText: `Oliver speaks Polish (${tag}).` })).toContainText("Added by you");
     // Pasting the same again skips them.
     await page.getByLabel("Paste memories, one per line").fill(`Oliver speaks Polish (${tag}).`);
     await page.getByRole("button", { name: "Add 1 memory" }).click();
-    await expect(page.locator("[role=status]")).toContainText("Skipped 1 already in the vault");
+    await expect(page.locator(".alert[role=status]")).toContainText("Skipped 1 already in the vault");
   });
 
   test("goals and tasks: add, link, complete", async ({ page }) => {
@@ -365,16 +425,19 @@ test.describe.serial("Maverick", () => {
     await page.getByLabel("Outcome").fill(goalName);
     await page.getByLabel("How you'll measure it").fill("Checkride passed");
     await page.getByRole("button", { name: "Add goal" }).click();
-    await expect(page.locator(".goal-item", { hasText: goalName })).toBeVisible();
+    await expect(page.locator(".goal-row", { hasText: goalName })).toBeVisible();
+    await page.getByText("More options (goal, exact reminder)").click();
     await page.getByLabel("New task").fill(taskName);
     await page.getByLabel("Priority").selectOption("1");
     await page.getByLabel("Goal", { exact: true }).selectOption({ label: goalName });
     await page.getByRole("button", { name: "Add", exact: true }).click();
     const row = page.locator(".task-row", { hasText: taskName });
     await expect(row).toContainText(`→ ${goalName}`);
-    await page.goto("/");
-    const quick = page.locator(".task-row", { hasText: taskName });
-    await quick.getByRole("checkbox").check();
+    // The goal now shows progress from its linked task.
+    await expect(page.locator(".goal-row", { hasText: goalName })).toContainText("0/1 tasks");
+    await row.getByRole("checkbox").click(); // the row leaves the open list once done
+    await expect(page.locator(".toast").last()).toContainText(`Done: ${taskName}`);
+    await expect(page.locator(".goal-row", { hasText: goalName })).toContainText("1/1 tasks");
     await page.reload();
     await expect(page.locator(".task-row", { hasText: taskName })).toHaveCount(0);
   });
@@ -383,7 +446,7 @@ test.describe.serial("Maverick", () => {
     await ensureAccount(page);
     await page.goto("/");
     await expect(page.getByText("Deep work: client proposal")).toBeVisible(); // agenda card (demo calendar)
-    await page.getByRole("button", { name: "Brief me now" }).click();
+    await page.getByRole("button", { name: /Brief me/ }).click();
     await page.waitForURL(/\/chat\/[0-9a-f-]{36}/);
     const brief = page.locator(".msg-assistant").first();
     await expect(brief).toContainText("Good morning, Oliver");

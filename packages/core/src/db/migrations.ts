@@ -280,6 +280,22 @@ export const MIGRATIONS: { id: string; sql: string }[] = [
       CREATE INDEX message_files_file_idx ON message_files(file_id);
     `,
   },
+  {
+    id: "0005_focus_sessions",
+    sql: `
+      -- Focus timer sessions (Pomodoro-style), for accountability and statistics.
+      CREATE TABLE focus_sessions (
+        id              TEXT PRIMARY KEY,
+        user_id         TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        task_id         TEXT REFERENCES tasks(id) ON DELETE SET NULL,
+        planned_minutes INTEGER NOT NULL CHECK (planned_minutes BETWEEN 1 AND 240),
+        started_at      TIMESTAMPTZ NOT NULL,
+        ended_at        TIMESTAMPTZ,
+        completed       BOOLEAN NOT NULL DEFAULT false
+      );
+      CREATE INDEX focus_sessions_user_idx ON focus_sessions(user_id, started_at DESC);
+    `,
+  },
 ];
 
 export async function migrate(db: Db): Promise<string[]> {

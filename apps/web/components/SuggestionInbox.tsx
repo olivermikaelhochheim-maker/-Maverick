@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/client";
+import { toast } from "@/lib/toast";
 
 export interface SuggestionView {
   id: string;
@@ -38,6 +39,11 @@ export function SuggestionInbox({ initial, compact = false }: { initial: Suggest
     setError(null);
     try {
       await api(`/api/suggestions/${id}`, { body: { action, title } });
+      const item = items.find((x) => x.id === id);
+      if (action === "accept" && item) {
+        const where = item.kind === "memory" ? { label: "Memory Vault", href: "/memory" } : { label: "Goals & tasks", href: "/planning" };
+        toast({ text: item.kind === "memory" ? "Saved to memory." : item.kind === "goal" ? "Goal added." : "Task added.", link: { label: "View", href: where.href } });
+      }
       setItems((xs) => xs.filter((x) => x.id !== id));
       setEditing(null);
     } catch (err) {

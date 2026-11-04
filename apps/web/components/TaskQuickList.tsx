@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/client";
+import { toast } from "@/lib/toast";
 
 export interface TaskView {
   id: string;
@@ -19,6 +20,7 @@ export function TaskQuickList({ initial, today }: { initial: TaskView[]; today: 
     setTasks((xs) => xs.map((x) => (x.id === t.id ? { ...x, status } : x)));
     try {
       await api(`/api/tasks/${t.id}`, { method: "PATCH", body: { status } });
+      if (status === "done") toast(`Done: ${t.title}. One less thing.`);
     } catch {
       setTasks((xs) => xs.map((x) => (x.id === t.id ? t : x)));
     }

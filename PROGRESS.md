@@ -1,6 +1,6 @@
 # Maverick: progress log
 
-## Status: Milestone 5 (files) built and tested. Cloud deployment (Milestone 4) ready for Oliver to deploy.
+## Status: Milestone 6 (UX overhaul) built and tested. Cloud deployment ready for Oliver.
 
 Last updated: 2026-10-24 · Code: https://github.com/olivermikaelhochheim-maker/-Maverick
 
@@ -53,12 +53,22 @@ Single-user auth, streaming chat, model routing (Haiku/Sonnet/Opus 5.5), hard bu
 - Encrypted storage, safe downloads, 300 MB cap, per-file token/page estimate shown before sending
 - ADR 0013
 
+### Milestone 6: UX overhaul
+- **Command Center as a live cockpit**: clock, waking-day progress ring, next-event countdown, 7-day stat tiles with trend deltas and sparklines (tasks, focus, streak, spend + projection), focus timer, rule-based "Maverick noticed" insights (overdue, upcoming deadlines, stalled goals, streaks, best time of day, spend pace), timeline of today, priorities with quick add, goal progress, 14-day activity charts, inbox
+- **⌘K command palette**: ask, add a task (smart parsing, preferred when the line looks like a task), remember, start focus, brief me, jump to pages and conversations
+- **Smart quick add**: dates (today/tomorrow/weekdays/in N days/next week/20.11/ISO), times, priorities, #goal, English + Norwegian
+- **Focus timer** (sessions stored server-side, survive reloads, end chime, notification) feeding streak and statistics
+- **Goals & Tasks**: grouped Overdue / Today / Next 7 days / Later / No date, one-tap "→ today", live goal progress
+- **Usage**: on-track banner, projection, cumulative spend vs soft/hard limits chart, cost by model, daily spend, table views
+- **Chat**: starters built from your day, orb avatar, Copy / Read aloud on replies
+- Nav counters, toasts, entrance motion (respects reduced motion); chart colours validated for the navy surface (dataviz validator)
+
 ## Test results (2026-10-24, Linux cloud container)
 | Suite | Result |
 |---|---|
 | TypeScript typecheck (core + web) | ✅ pass |
-| Core unit + integration (Vitest, real embedded Postgres) | ✅ 130 / 130 |
-| Browser end-to-end (Playwright, production build; iPhone 15 + desktop) | ✅ 42 passed, 2 skipped by design |
+| Core unit + integration (Vitest, real embedded Postgres) | ✅ 138 / 138 |
+| Browser end-to-end (Playwright, production build; iPhone 15 + desktop) | ✅ 46 passed, 2 skipped by design |
 | Docker image smoke test (cloud configuration, restart) | ✅ 17 / 17 checks |
 
 New coverage: Oslo DST time maths and quiet hours across midnight; memory provenance, expiry, selection reasons and token cap; task ranking and reminders; accept/edit/dismiss semantics; proposal tool validation and limits; strict-schema compatibility; chat context (memories, goals, tasks, calendar) and tool events; Google token refresh, unselected calendars, declined events, revoked tokens, missing-scope refusal; push consent, quiet hours, daily cap, dead subscriptions, endpoint allowlist; briefing template vs. model, budget fallback, once-per-day scheduling, catch-up, opt-out; export.

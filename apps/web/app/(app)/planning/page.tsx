@@ -9,7 +9,7 @@ export default async function PlanningPage() {
   const settings = await getSettings(m.db, m.cipher, user.id);
   const [goals, tasks, suggestions] = await Promise.all([
     m.deps.planning.listGoals(user.id),
-    m.deps.planning.listTasks(user.id),
+    m.deps.planning.listTasks(user.id, { status: "all", limit: 500 }),
     m.deps.suggestions.list(user.id, "pending"),
   ]);
   return (
@@ -24,7 +24,7 @@ export default async function PlanningPage() {
         <h2 id="h-inbox">Suggestion inbox {suggestions.length > 0 && <span className="badge badge-accent">{suggestions.length}</span>}</h2>
         <SuggestionInbox initial={suggestions} />
       </section>
-      <Planning initialGoals={goals} initialTasks={tasks} today={localParts(settings.timezone).date} />
+      <Planning initialGoals={goals} initialTasks={tasks} today={localParts(settings.timezone).date} tz={settings.timezone} />
     </div>
   );
 }

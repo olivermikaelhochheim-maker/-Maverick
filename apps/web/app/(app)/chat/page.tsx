@@ -1,3 +1,4 @@
+import { computeDashboard, getSettings } from "@maverick/core";
 import { ChatView } from "@/components/ChatView";
 import { getMaverick, requireUser } from "@/lib/server";
 
@@ -8,6 +9,8 @@ export default async function ChatIndex({ searchParams }: { searchParams: Promis
   // "Ask Maverick about this" from the Files page.
   const initialFile = typeof file === "string" ? await m.deps.files.get(user.id, file) : null;
   const conversations = await m.chat.conversations.list(user.id, 100);
+  const settings = await getSettings(m.db, m.cipher, user.id);
+  const starters = (await computeDashboard(m.db, m.cipher, m.deps, user, settings)).prompts;
   return (
     <ChatView
       key="new"
@@ -15,6 +18,7 @@ export default async function ChatIndex({ searchParams }: { searchParams: Promis
       initialMessages={[]}
       initialQuery={typeof q === "string" ? q.slice(0, 2000) : undefined}
       initialFiles={initialFile ? [initialFile] : undefined}
+      starters={starters}
       mode={m.providers.mode}
     />
   );

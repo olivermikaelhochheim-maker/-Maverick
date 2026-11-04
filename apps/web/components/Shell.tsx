@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { Icon } from "./Icons";
 import { Orb } from "./Orb";
+import { CommandPalette } from "./CommandPalette";
+import { Toaster } from "./Toaster";
 
 const NAV = [
   { href: "/", label: "Command Center", short: "Home", icon: Icon.home, mobile: true },
@@ -26,7 +28,9 @@ function isActive(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function Shell({ children, mode }: { children: ReactNode; mode: "live" | "mock" }) {
+type Counts = Record<string, { n: number; alert?: boolean }>;
+
+export function Shell({ children, mode, counts = {} }: { children: ReactNode; mode: "live" | "mock"; counts?: Counts }) {
   const pathname = usePathname();
   return (
     <div className="shell">
@@ -36,11 +40,17 @@ export function Shell({ children, mode }: { children: ReactNode; mode: "live" | 
           <span className="brand-mark"><Orb size={26} /></span>
           MAVERICK
         </div>
+        <button className="cmd-trigger" onClick={() => window.dispatchEvent(new Event("mvk:palette"))}>
+          <span>✦ Search or do…</span> <span className="kbd">⌘K</span>
+        </button>
         <ul className="nav-list">
           {NAV.map((n) => (
             <li key={n.href}>
               <Link className="nav-link" href={n.href} aria-current={isActive(pathname, n.href) ? "page" : undefined}>
                 <n.icon /> {n.label}
+                {counts[n.href]?.n ? (
+                  <span className={`nav-count${counts[n.href]!.alert ? " alert" : ""}`} aria-label={`${counts[n.href]!.n} need attention`}>{counts[n.href]!.n}</span>
+                ) : null}
               </Link>
             </li>
           ))}
@@ -60,6 +70,8 @@ export function Shell({ children, mode }: { children: ReactNode; mode: "live" | 
         </div>
       </nav>
       <main id="main" className="main">{children}</main>
+      <CommandPalette />
+      <Toaster />
       <nav className="tabbar" aria-label="Main">
         {NAV.filter((n) => n.mobile).map((n) => (
           <Link
@@ -68,6 +80,7 @@ export function Shell({ children, mode }: { children: ReactNode; mode: "live" | 
             aria-current={isActive(pathname, n.href) || (n.href === "/settings" && ["/usage", "/security", "/files"].some((p) => isActive(pathname, p))) ? "page" : undefined}
           >
             <n.icon /> {n.short}
+            {counts[n.href]?.n ? <span className="tab-dot" aria-label={`${counts[n.href]!.n} need attention`}>{counts[n.href]!.n}</span> : null}
           </Link>
         ))}
       </nav>

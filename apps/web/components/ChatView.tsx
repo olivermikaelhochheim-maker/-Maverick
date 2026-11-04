@@ -8,6 +8,7 @@ import { Markdown } from "./Markdown";
 import { Orb } from "./Orb";
 import { Listener, Speaker, canListen, loadPrefs, resolveVoice, unlockSpeech, type VoicePrefs } from "@/lib/voice";
 import { ACCEPT, KIND_ICON, formatTokens, prepareFile, uploadFile, type UploadedFile } from "@/lib/upload";
+import { toast } from "@/lib/toast";
 
 export interface UiMessage {
   id: string;
@@ -69,6 +70,8 @@ export function ChatView(props: {
   initialQuery?: string;
   /** Files to start with attached (from "Ask Maverick about this" in Files) */
   initialFiles?: UploadedFile[];
+  /** Conversation starters built from Oliver's day */
+  starters?: string[];
   mode: "live" | "mock";
 }) {
   const [conversations, setConversations] = useState(props.conversations);
@@ -413,11 +416,14 @@ export function ChatView(props: {
                 <Orb size={88} />
                 <h2>How can I help, Oliver?</h2>
                 <p className="small">
-                  {micAvailable ? "Type, or tap the microphone and talk." : <>Type below. To talk instead, turn on voice in <a href="/settings#voice">Settings</a>.</>}
+                  {micAvailable ? "Type, talk with the mic, or attach a file with 📎." : <>Type below, or attach a file with 📎. To talk, turn on voice in <a href="/settings#voice">Settings</a>.</>}
                 </p>
-                <div className="suggestions">
-                  {SUGGESTIONS.map((s) => (
-                    <button key={s} className="btn btn-sm" onClick={() => void send(s)}>{s}</button>
+                <div className="starter-grid">
+                  {(props.starters?.length ? props.starters : SUGGESTIONS).slice(0, 4).map((s, i) => (
+                    <button key={s} className="starter reveal" style={{ ["--i" as string]: i }} onClick={() => void send(s)}>
+                      <small>{["Right now", "Clear the deck", "Momentum", "Think it through"][i]}</small>
+                      {s}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -438,7 +444,9 @@ export function ChatView(props: {
                 </div>
               ) : (
                 <article key={m.id} className={`msg msg-assistant${m.status === "error" ? " msg-error" : ""}`}>
-                  <div className="who">MAVERICK</div>
+                  <div className="who">
+                    <Orb size={26} state={m.status === "streaming" ? "speaking" : "idle"} />
+                  </div>
                   <div className={`body${m.status === "streaming" ? " cursor" : ""}`}>
                     {m.content ? <Markdown text={m.content} /> : m.status === "streaming" ? <span className="faint">Thinking…</span> : null}
                   </div>
@@ -450,6 +458,34 @@ export function ChatView(props: {
                       {m.firstTokenMs !== undefined && <span>first word {(m.firstTokenMs / 1000).toFixed(1)}s</span>}
                       {m.voiceLatencyMs !== undefined && <span title="From when you finished speaking to Maverick's first spoken word">🔊 spoke after {(m.voiceLatencyMs / 1000).toFixed(1)}s</span>}
                       {m.status === "partial" && <span className="badge badge-warn">incomplete</span>}
+                      <span className="msg-actions">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void navigator.clipboard?.writeText(m.content);
+                            toast("Copied.");
+                          }}
+                        >
+                          Copy
+                        </button>
+                        {prefs?.enabled && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              unlockSpeech();
+                              stopSpeaking();
+                              const sp = new Speaker(voiceRef.current, prefs);
+                              speakerRef.current = sp;
+                              sp.onStart = () => setSpeaking(true);
+                              sp.onIdle = () => setSpeaking(false);
+                              sp.push(m.content);
+                              sp.finish();
+                            }}
+                          >
+                            Read aloud
+                          </button>
+                        )}
+                      </span>
                     </div>
                   )}
                   {m.suggestions && m.suggestions.length > 0 && (

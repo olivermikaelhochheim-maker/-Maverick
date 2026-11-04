@@ -157,11 +157,17 @@ Disconnect any time in Settings; it also revokes Maverick's access at Google.
 
 ---
 
+## Getting around fast
+
+- **⌘K** (Ctrl+K on Windows), or tap **✦ Ask or do anything**: one box for everything. Type a question to ask Maverick; type a task like `Call flight school friday 10:00 !1 #pilot` and Maverick understands the day, time, priority (!1 high, !3 low) and goal; start with "remember" content to save a memory; or type a page name to jump there.
+- **Quick add** on the Command Center and Goals & Tasks understands the same shorthand, including Norwegian ("i morgen kl 9", "fredag") and dates like 20.11.
+- **Focus timer** on the Command Center: pick 15/25/50/90 minutes and a task, start, and Maverick counts down (with a chime at the end). Focus time feeds your streak and statistics.
+
 ## Where things are
 
 | Screen | What it does |
 |---|---|
-| Command Center | Greeting, briefing, today's agenda, top priorities (tick to complete), suggestion inbox, goals, spend |
+| Command Center | Live day overview: clock and day progress, next event countdown, 7-day stats with trends (tasks, focus, streak, spend), focus timer, "Maverick noticed" insights, today's timeline, priorities with quick add, goal progress, 14-day activity charts, suggestion inbox |
 | Conversation | Chat. Each reply shows the model, why it was chosen, and the cost. **Context used** shows which memories Maverick saw and why. Suggestions appear as chips with Accept/✕. |
 | Goals & Tasks | Inbox, tasks (priority, due date, reminder, linked goal), goals with measurable outcomes |
 | Memory Vault | Search, add, edit, pin, delete; retention per memory; provenance for each; export |

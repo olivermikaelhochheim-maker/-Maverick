@@ -15,6 +15,7 @@ import { AgendaService } from "../integrations/calendar";
 import { IntegrationStore } from "../integrations/store";
 import { renderState, snapshot } from "../context";
 import { FileStore } from "../files";
+import { FocusStore } from "../focus";
 import { BudgetExceededError, UserFacingError } from "../util/errors";
 import { formatLocalNow } from "../util/time";
 import { log } from "../util/logger";
@@ -72,6 +73,7 @@ export const EFFORT: Record<Tier, "low" | "medium" | "high"> = { fast: "low", st
 
 export interface ChatDeps {
   files: FileStore;
+  focus: FocusStore;
   memory: MemoryStore;
   planning: PlanningStore;
   suggestions: SuggestionStore;
@@ -83,6 +85,7 @@ export function defaultDeps(db: Db, cipher: FieldCipher): ChatDeps {
   const planning = new PlanningStore(db, cipher);
   return {
     files: new FileStore(db, cipher),
+    focus: new FocusStore(db),
     memory,
     planning,
     suggestions: new SuggestionStore(db, cipher, memory, planning),

@@ -30,3 +30,6 @@ export * from "./auth/mfa";
 export { totpAt } from "./auth/totp";
 export { importAll } from "./import";
 export * from "./files";
+export * from "./focus";
+export * from "./dashboard";
+export { parseQuickTask, type QuickTask } from "./quickadd";
