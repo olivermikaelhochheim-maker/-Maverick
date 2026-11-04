@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getSettings } from "@maverick/core";
+import { getSettings, googleConfigProblem, maskClientId } from "@maverick/core";
 import { LogoutButton } from "@/components/AuthForms";
 import { CalendarPanel } from "@/components/CalendarPanel";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
@@ -40,6 +40,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             mode={m.calendarMode}
             connected={google ? { email: google.accountEmail, status: google.status, scopes: google.scopes } : null}
             flash={googleFlash}
+            setup={m.google ? { clientId: maskClientId(m.google.clientId), redirectUri: m.google.redirectUri, problem: googleConfigProblem(m.google) } : null}
           />
         </section>
         <section className="card span-6" aria-labelledby="h-notif">

@@ -25,11 +25,38 @@ export function publicBaseUrl(): string {
 }
 
 /** Google OAuth client credentials from env/Keychain. Null when not set up yet. */
+/** Strip the whitespace and quotes that sneak in when copy-pasting credentials. */
+const cleanCredential = (v: string | undefined) => v?.trim().replace(/^["']|["']$/g, "").trim() || undefined;
+
+/** Google OAuth client IDs look like 123456789012-abc123def.apps.googleusercontent.com */
+export const GOOGLE_CLIENT_ID_PATTERN = /^\d+-[a-z0-9]+\.apps\.googleusercontent\.com$/;
+
 export function googleConfig(publicUrl = publicBaseUrl()): GoogleConfig | null {
-  const clientId = getSecret("GOOGLE_CLIENT_ID");
-  const clientSecret = getSecret("GOOGLE_CLIENT_SECRET");
+  const clientId = cleanCredential(getSecret("GOOGLE_CLIENT_ID"));
+  const clientSecret = cleanCredential(getSecret("GOOGLE_CLIENT_SECRET"));
   if (!clientId || !clientSecret) return null;
   return { clientId, clientSecret, redirectUri: `${publicUrl.replace(/\/$/, "")}/api/integrations/google/callback` };
+}
+
+/**
+ * Catch credential mistakes before sending Oliver to Google, where they show up
+ * as an unhelpful "invalid_client" page. Returns a plain-language problem, or null.
+ */
+export function googleConfigProblem(cfg: GoogleConfig): string | null {
+  if (GOOGLE_CLIENT_ID_PATTERN.test(cfg.clientSecret)) return "The Client ID and Client secret look swapped.";
+  if (!cfg.clientId.endsWith(".apps.googleusercontent.com")) {
+    return "The Client ID should end with .apps.googleusercontent.com. Check you copied the Client ID (not the project ID or the secret).";
+  }
+  if (!GOOGLE_CLIENT_ID_PATTERN.test(cfg.clientId)) return "The Client ID has unexpected characters. Copy it again with Google's copy button.";
+  if (cfg.clientSecret.length < 20) return "The Client secret looks too short. Copy it again with Google's copy button.";
+  return null;
+}
+
+/** The ID with the middle hidden, so Oliver can compare it with Google Cloud Console. */
+export function maskClientId(id: string): string {
+  const [num, rest] = id.split("-", 2);
+  if (!num || !rest) return id.slice(0, 12) + "…";
+  return `${num}-${rest.slice(0, 4)}…${rest.slice(rest.indexOf(".apps"))}`;
 }
 
 export class GoogleAuthError extends Error {

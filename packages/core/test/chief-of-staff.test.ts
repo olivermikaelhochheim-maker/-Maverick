@@ -5,7 +5,7 @@ import type { ChatRequest, LLMProvider } from "../src/llm/types";
 import { updateSettings, getSettings } from "../src/settings";
 import { AgendaService, MockCalendarSource, renderAgenda } from "../src/integrations/calendar";
 import { IntegrationStore } from "../src/integrations/store";
-import { GoogleCalendarSource, buildAuthUrl, exchangeCode, pkcePair } from "../src/integrations/google";
+import { GoogleCalendarSource, buildAuthUrl, exchangeCode, googleConfig, googleConfigProblem, maskClientId, pkcePair } from "../src/integrations/google";
 import { Notifier, validateSubscription } from "../src/notify";
 import { BriefingService } from "../src/briefing";
 import { Scheduler, dueBriefings } from "../src/scheduler";
@@ -134,6 +134,20 @@ describe("calendar", () => {
     expect(url.searchParams.get("scope")).toContain("calendar.readonly");
     expect(url.searchParams.get("scope")).not.toMatch(/calendar(\s|$)|calendar.events(\s|$)/);
     expect(url.searchParams.get("access_type")).toBe("offline");
+  });
+
+  it("Google: catches copy-paste mistakes in the credentials before sending Oliver to Google", () => {
+    const good = { clientId: "123456789012-abcdef0123456789.apps.googleusercontent.com", clientSecret: "GOCSPX-abcdefghijklmnopqrstuvwx", redirectUri: "r" };
+    expect(googleConfigProblem(good)).toBeNull();
+    expect(googleConfigProblem({ ...good, clientId: good.clientSecret, clientSecret: good.clientId })).toMatch(/swapped/);
+    expect(googleConfigProblem({ ...good, clientId: "maverick-123456" })).toMatch(/should end with/);
+    expect(googleConfigProblem({ ...good, clientId: "12345-abc def.apps.googleusercontent.com" })).toMatch(/unexpected characters/);
+    expect(maskClientId(good.clientId)).toBe("123456789012-abcd….apps.googleusercontent.com");
+    process.env.GOOGLE_CLIENT_ID = '  "123456789012-abcdef0123456789.apps.googleusercontent.com" ';
+    process.env.GOOGLE_CLIENT_SECRET = "'GOCSPX-abcdefghijklmnopqrstuvwx'";
+    expect(googleConfig("https://m.example")).toMatchObject({ clientId: good.clientId, clientSecret: good.clientSecret, redirectUri: "https://m.example/api/integrations/google/callback" });
+    delete process.env.GOOGLE_CLIENT_ID;
+    delete process.env.GOOGLE_CLIENT_SECRET;
   });
 
   it("Google: refuses a sign-in where calendar access wasn't granted", async () => {
