@@ -11,6 +11,7 @@ import type { ProviderSet } from "../llm";
 import { MemoryStore, renderMemories, type MemoryCategory } from "../memory";
 import { PlanningStore } from "../planning";
 import { SuggestionStore } from "../suggestions";
+import { LifeStore } from "../life";
 import { AgendaService } from "../integrations/calendar";
 import { IntegrationStore } from "../integrations/store";
 import { renderState, snapshot } from "../context";
@@ -76,6 +77,8 @@ export interface ChatDeps {
   planning: PlanningStore;
   suggestions: SuggestionStore;
   agenda: AgendaService;
+  /** Habits and journal (Life). Optional so older test setups keep working. */
+  life?: LifeStore;
 }
 
 export function defaultDeps(db: Db, cipher: FieldCipher): ChatDeps {
@@ -87,6 +90,7 @@ export function defaultDeps(db: Db, cipher: FieldCipher): ChatDeps {
     planning,
     suggestions: new SuggestionStore(db, cipher, memory, planning),
     agenda: new AgendaService(null, new IntegrationStore(db, cipher)),
+    life: new LifeStore(db, cipher),
   };
 }
 

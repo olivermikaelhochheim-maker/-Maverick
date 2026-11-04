@@ -36,19 +36,23 @@ const INSTRUCTIONS: Record<BriefingKind, (name: string) => string> = {
 - Open with a one-line greeting suited to the day.
 - Calendar: list today's events from the context only. Never invent events. If the calendar isn't connected, say so in one line.
 - Priorities: the top three things to move forward today, drawn from open tasks and goals. Say why if you reorder them.
+- Habits: if the context lists habits for today, name them in one line (include a weekly target that still needs sessions). Skip this if there are none.
 - If you see something genuinely useful ${n} hasn't planned (preparation for a meeting, recovery, a follow-up), propose it with suggest_action or propose_task. At most two proposals; none is fine.
 - End by asking which single outcome matters most today.
 Under 220 words. Warm, direct, no filler.`,
   evening: (n) => `[Scheduled evening check-in] Write ${n}'s evening check-in.
 - Acknowledge what got done today (completed tasks in the context), without flattery.
 - Note what's still open, without shaming.
+- Habits: if any of today's habits are not logged yet, list them and point to /life to log them. Treat rest and illness as legitimate. If ${n} allowed today's journal entry to be read, reflect it in one sentence; never quote private detail back at length.
 - Ask three short reflection questions: what went well, what got in the way, what's the first move tomorrow.
 - If a clear next action stands out for tomorrow, propose it with propose_task (at most one).
 Under 160 words.`,
   weekly: (n) => `[Scheduled weekly review] Write ${n}'s weekly review.
 - What moved this week (completed tasks in the context) and how it connects to the active goals.
 - Which goal got no attention, said plainly.
-- One honest observation about patterns (focus, procrastination, energy) only if the evidence supports it; otherwise skip it.
+- Habits: give the week's habit completion with its counts (e.g. "71%, 10 of 14"), what held and what slipped. Completion measures habits, not ${n}.
+- One honest observation about patterns (focus, procrastination, energy, mood) only if the evidence supports it, citing the dates from habit logs or journal entries; otherwise skip it. Never diagnose.
+- If a habit is clearly too ambitious, suggest reducing it with suggest_action. Never suggest raising a target unless it was consistently exceeded.
 - Propose up to three tasks for next week with propose_task, tied to goals.
 - End with: what is the one thing that would make next week a success?
 Under 300 words.`,
@@ -90,7 +94,11 @@ export class BriefingService {
     const local = localParts(settings.timezone, now);
     if (!opts.force && (await this.alreadyDone(user.id, kind, local.date))) return { status: "exists" };
 
-    const state = await snapshot(this.deps, user.id, settings, now);
+    let state = await snapshot(this.deps, user.id, settings, now);
+    // Evening and weekly runs may also read journal entries Oliver allowed Maverick to see.
+    if (kind !== "morning" && this.deps.life) {
+      state = { ...state, life: await this.deps.life.renderForModel(user.id, local.date, { journalDays: kind === "weekly" ? 7 : 1 }) };
+    }
     const since =
       kind === "weekly" ? zonedToUtc(addDays(local.date, -6), "00:00", settings.timezone) : zonedToUtc(local.date, "00:00", settings.timezone);
     const completed = kind === "morning" ? [] : await this.deps.planning.completedSince(user.id, since);
@@ -109,7 +117,8 @@ export class BriefingService {
       meta = written.meta;
     } else {
       note = written?.note ?? (this.providers.mode === "mock" ? "No AI model connected" : undefined);
-      content = template(kind, user.displayName, settings, state, completed, note);
+      const lifeLines = this.deps.life ? await this.deps.life.templateLines(user.id, local.date, kind) : [];
+      content = template(kind, user.displayName, settings, state, completed, note, lifeLines);
     }
 
     await this.conversations.addMessage(conversationId, {
@@ -220,6 +229,7 @@ export function template(
   state: StateSnapshot,
   completed: { title: string }[],
   note?: string,
+  lifeLines: string[] = [],
 ): string {
   const tz = settings.timezone;
   const lines: string[] = [];
@@ -247,18 +257,21 @@ export function template(
     agenda();
     lines.push("");
     open(3);
+    if (lifeLines.length) lines.push("", ...lifeLines);
     if (state.goals.length) lines.push("", `**Goals in play**: ${state.goals.slice(0, 4).map((g) => g.title).join(" · ")}`);
     if (state.pendingSuggestions) lines.push("", `${state.pendingSuggestions} suggestion${state.pendingSuggestions === 1 ? "" : "s"} waiting in your inbox.`);
     lines.push("", "**Which single outcome matters most today?**");
   } else if (kind === "evening") {
     lines.push(`Evening, ${name}. Two minutes to close the day.`, "");
     lines.push(completed.length ? `**Done today**\n${completed.map((t) => `- ${t.title}`).join("\n")}` : "**Done today**: nothing marked complete.");
+    if (lifeLines.length) lines.push("", ...lifeLines);
     lines.push("");
     open(3);
     lines.push("", "1. What went well?", "2. What got in the way?", "3. What's the first move tomorrow?");
   } else {
     lines.push(`Weekly review, ${name}.`, "");
     lines.push(completed.length ? `**Completed this week (${completed.length})**\n${completed.map((t) => `- ${t.title}`).join("\n")}` : "**Completed this week**: nothing marked complete.");
+    if (lifeLines.length) lines.push("", ...lifeLines);
     lines.push("", state.goals.length ? `**Active goals**\n${state.goals.map((g) => `- ${g.title}`).join("\n")}` : "**Active goals**: none recorded yet. That's the first thing to fix.");
     lines.push("", "**What is the one thing that would make next week a success?**");
   }

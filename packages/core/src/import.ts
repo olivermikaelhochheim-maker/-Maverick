@@ -6,6 +6,7 @@ import { updateSettings } from "./settings";
 import { MEMORY_CATEGORIES, RETENTIONS } from "./memory";
 import { HORIZONS } from "./planning";
 import { UserFacingError } from "./util/errors";
+import { LifeStore } from "./life";
 
 /**
  * Restore a "maverick-export-v1" file (Settings → Export all data) into this
@@ -31,6 +32,7 @@ export async function importAll(db: Db, cipher: FieldCipher, userId: string, dat
   const day = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
   const enc = (v: string | null) => (v === null ? null : cipher.encrypt(v));
   const result = { memories: 0, goals: 0, tasks: 0, conversations: 0, messages: 0 };
+  const goalIds = new Map<string, string>();
 
   await db.transaction(async (tx) => {
     for (const m of arr("memories")) {
@@ -57,7 +59,6 @@ export async function importAll(db: Db, cipher: FieldCipher, userId: string, dat
       result.memories++;
     }
 
-    const goalIds = new Map<string, string>();
     for (const g of arr("goals")) {
       const title = str(g.title, 200);
       if (!title) continue;
@@ -154,6 +155,13 @@ export async function importAll(db: Db, cipher: FieldCipher, userId: string, dat
     }
   });
 
+  // Life (habits, logs, journal), present in exports made after the Life dashboard was added.
+  let life: { habits: number; habitLogs: number; journal: number } | null = null;
+  if (d.life && typeof d.life === "object") {
+    const r = await new LifeStore(db, cipher).importAll(userId, d, { goalIds });
+    life = { habits: r.habits, habitLogs: r.logs, journal: r.journal };
+  }
+
   if (d.settings && typeof d.settings === "object") {
     try {
       await updateSettings(db, cipher, userId, d.settings);
@@ -161,6 +169,7 @@ export async function importAll(db: Db, cipher: FieldCipher, userId: string, dat
       // Invalid settings in an old export shouldn't block the rest of the import.
     }
   }
-  await audit(db, { userId, actor: "user", action: "data.imported", details: result });
-  return result;
+  const out: Record<string, number> = { ...result, ...(life ?? {}) };
+  await audit(db, { userId, actor: "user", action: "data.imported", details: out });
+  return out;
 }

@@ -78,6 +78,7 @@ export class Scheduler {
           }
         }
         out.reminders += await this.sendReminders(user, settings, now);
+        out.reminders += await this.sendHabitReminders(user, settings, now);
       }
       await this.deps.memory.purgeExpired();
       await this.deps.suggestions.expireOld();
@@ -87,6 +88,27 @@ export class Scheduler {
       this.running = false;
     }
     return out;
+  }
+
+  /** Habit reminders: once per habit per local day, only if it's due and not logged yet. */
+  private async sendHabitReminders(user: User, settings: Settings, now: Date): Promise<number> {
+    const life = this.deps.life;
+    if (!life) return 0;
+    const local = localParts(settings.timezone, now);
+    let sent = 0;
+    for (const h of await life.dueHabitReminders(user.id, local.date, local.hhmm)) {
+      if (!this.notifier) {
+        await life.markHabitReminded(h.id, local.date);
+        continue;
+      }
+      const body = h.minimum ? `${h.title}. Minimum counts: ${h.minimum}` : h.title;
+      const res = await this.notifier.notify(user.id, settings, { kind: "reminder", title: "Habit", body, url: "/life" }, now);
+      // Quiet hours: hold it; it goes out when they end, if still due that day.
+      if (res.reason === "quiet_hours") continue;
+      await life.markHabitReminded(h.id, local.date);
+      if (res.status === "sent") sent++;
+    }
+    return sent;
   }
 
   private async sendReminders(user: User, settings: Settings, now: Date): Promise<number> {

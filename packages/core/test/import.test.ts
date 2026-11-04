@@ -22,7 +22,7 @@ describe("moving Maverick: export → import", () => {
     const user = await seedUser(db);
     const cipher = testCipher();
     const counts = await importAll(db, cipher, user.id, exported);
-    expect(counts).toEqual({ memories: 2, goals: 1, tasks: 1, conversations: 1, messages: 2 });
+    expect(counts).toEqual({ memories: 2, goals: 1, tasks: 1, conversations: 1, messages: 2, habits: 0, habitLogs: 0, journal: 0 });
 
     const deps = defaultDeps(db, cipher);
     const mems = await deps.memory.list(user.id);

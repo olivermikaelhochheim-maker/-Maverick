@@ -29,7 +29,8 @@ export function ImportPanel() {
               const data = await res.json();
               if (!res.ok) throw new Error(data.error ?? "Import failed.");
               const c = data.imported as Record<string, number>;
-              setStatus({ kind: "ok", text: `Imported ${c.memories} memories, ${c.goals} goals, ${c.tasks} tasks and ${c.conversations} conversations.` });
+              const life = c.habits !== undefined ? ` Life: ${c.habits} habits, ${c.habitLogs} habit logs and ${c.journal} journal entries.` : "";
+              setStatus({ kind: "ok", text: `Imported ${c.memories} memories, ${c.goals} goals, ${c.tasks} tasks and ${c.conversations} conversations.${life}` });
             } catch (err) {
               setStatus({ kind: "error", text: (err as Error).message });
             } finally {

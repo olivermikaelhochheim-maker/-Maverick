@@ -161,7 +161,7 @@ test.describe.serial("Maverick", () => {
 
   test("every page fits the screen without sideways scrolling", async ({ page }) => {
     await ensureAccount(page);
-    for (const p of ["/", "/chat", "/planning", "/memory", "/files", "/usage", "/security", "/settings"]) {
+    for (const p of ["/", "/chat", "/planning", "/life", "/life/journal", "/life/habits", "/memory", "/files", "/usage", "/security", "/settings"]) {
       await page.goto(p);
       await noHorizontalScroll(page);
     }
@@ -377,6 +377,49 @@ test.describe.serial("Maverick", () => {
     await quick.getByRole("checkbox").check();
     await page.reload();
     await expect(page.locator(".task-row", { hasText: taskName })).toHaveCount(0);
+  });
+
+  test("Life: add a habit, log it, write a journal entry that autosaves and is searchable", async ({ page }) => {
+    await ensureAccount(page);
+    const tag = test.info().project.name;
+    const habit = `Walk 20 minutes (${tag})`;
+    await page.goto("/life/habits");
+    await page.getByRole("button", { name: "New habit" }).click();
+    await page.getByLabel("Action").fill(habit);
+    await page.getByLabel("Minimum version, for bad days").fill("Around the block");
+    await page.getByRole("button", { name: "Add habit" }).click();
+    await expect(page.locator(".habit-card", { hasText: habit })).toBeVisible();
+    await expect(page.locator(".week-grid")).toContainText(habit);
+
+    await page.goto("/life");
+    const row = page.locator(".habit-row", { hasText: habit });
+    await expect(row).toContainText("Minimum: Around the block");
+    await row.getByRole("button", { name: `Mark as done: ${habit}` }).click();
+    await expect(row).toHaveClass(/is-done/);
+    await page.reload();
+    await expect(page.locator(".habit-row", { hasText: habit })).toHaveClass(/is-done/);
+    await expect(page.locator("#h-week").locator("..")).toContainText("done");
+    await noHorizontalScroll(page);
+
+    const words = `Ramp shift then statistics revision ${tag}`;
+    await page.goto("/life/journal");
+    await page.getByRole("button", { name: "Write today's entry" }).click();
+    await page.getByRole("radiogroup", { name: "Mood" }).getByRole("radio", { name: "4" }).check(); // today's entry may already exist from the other project
+    await page.getByLabel("Entry", { exact: true }).fill(words);
+    await expect(page.getByRole("status").filter({ hasText: "Saved" })).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("button", { name: "← All entries" }).click();
+    await page.getByLabel("Search entries").fill(`revision ${tag}`);
+    await expect(page.locator(".entry-card")).toHaveCount(1);
+    await expect(page.locator(".entry-card")).toContainText("Mood 4");
+
+    await page.goto("/");
+    await expect(page.locator("#h-life").locator("..")).toContainText("of today's habits");
+  });
+
+  test("Life: refuses logging the future through the API", async ({ page }) => {
+    await ensureAccount(page);
+    const res = await page.request.put("/api/life/logs", { data: { habitId: "x", date: "2999-01-01", status: "done" }, headers: { Origin: new URL(page.url()).origin } });
+    expect(res.status()).toBe(400);
   });
 
   test("Brief me now: a briefing built from the calendar and tasks", async ({ page }) => {
