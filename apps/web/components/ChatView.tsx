@@ -354,6 +354,11 @@ export function ChatView(props: {
 
   const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
   const orbState = listening ? "listening" : speaking ? "speaking" : busy ? (lastAssistant?.content ? "speaking" : "thinking") : "idle";
+  // Bind the AI core in the command bar to what's really happening here.
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("mvk:core", { detail: { source: "chat", listening, thinking: busy } }));
+  }, [listening, busy]);
+  useEffect(() => () => void window.dispatchEvent(new CustomEvent("mvk:core", { detail: { source: "chat", listening: false, thinking: false } })), []);
 
   return (
     <div className="chat">

@@ -126,7 +126,7 @@ test.describe.serial("Maverick", () => {
     await ensureAccount(page);
     const tag = test.info().project.name;
     await page.goto("/");
-    await page.getByRole("button", { name: /Ask or do anything/ }).click();
+    await page.getByRole("button", { name: /Ask, command or jump to/ }).click();
     const box = page.getByLabel("Command", { exact: true });
     await box.fill("How should I think about Zorza revenue?");
     await box.press("Enter"); // first item: Ask Maverick
@@ -155,7 +155,7 @@ test.describe.serial("Maverick", () => {
     await page.goto("/");
     await expect(page.getByText("Tasks done · 7 days")).toBeVisible();
     await expect(page.getByText("Focus time · 7 days")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Maverick noticed" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Recommendations" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Tasks completed per day" })).toBeVisible();
 
     // Quick add shows what it understood before saving.
@@ -219,7 +219,7 @@ test.describe.serial("Maverick", () => {
 
   test("every page fits the screen without sideways scrolling", async ({ page }) => {
     await ensureAccount(page);
-    for (const p of ["/", "/chat", "/planning", "/memory", "/files", "/usage", "/security", "/settings"]) {
+    for (const p of ["/", "/chat", "/missions", "/agents", "/ops", "/planning", "/finance", "/health", "/comms", "/research", "/automations", "/logs", "/permissions", "/more", "/memory", "/files", "/usage", "/security", "/settings"]) {
       const res = await page.goto(p);
       expect(res?.status(), `${p} should load without a server error`).toBeLessThan(400);
       await expect(page.getByText(/Application error|Internal Server Error/)).toHaveCount(0);

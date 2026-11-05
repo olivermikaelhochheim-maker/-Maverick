@@ -24,7 +24,7 @@ export function SessionsPanel({ initial }: { initial: SessionInfo[] }) {
       <ul className="list-plain">
         {sessions.map((s) => (
           <li key={s.id}>
-            <div className="item row" style={{ justifyContent: "space-between" }}>
+            <div className="item kv-row" style={{ justifyContent: "space-between" }}>
               <span>
                 {device(s.userAgent)} {s.current && <span className="badge badge-accent">this device</span>}
                 <br />

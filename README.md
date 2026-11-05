@@ -1,8 +1,15 @@
 # Maverick
 
-A private AI chief of staff and strategic advisor for Oliver. It runs on your Mac; you use it from the Mac or your iPhone.
+A private AI chief of staff and command system for Oliver. It runs on your Mac or in the cloud; you use it from any device.
 
 **What works today**
+- **Missions**: give Maverick an objective ("Prepare me for tomorrow", "Situation report", "Research …", or your own). He plans the steps, runs what your autonomy mode allows, asks before anything else, and writes a report. Every step is logged.
+- **Four autonomy modes** (Advisory, Assisted, Autonomous, Autopilot), per-tool permissions, daily limits, and an **E-STOP** button on every screen.
+- **Automations**: recurring missions (e.g. prepare for tomorrow every evening at 20:30).
+- **Finance** from your own bank CSV exports (DNB, SpareBank 1, Sbanken, Nordea…): spending by category, budgets, recurring charges, unusual charges. Read-only: no bank connection, nothing can be paid.
+- **Health & performance** logs: workouts, sleep, weight, energy, with weekly trends.
+- **Communications**: Maverick drafts emails; you send them from your own mail app.
+- **Voice commands**: tap the mic in the top bar and say "Prepare me for tomorrow".
 - **Conversation** with Claude, streamed live, with cost-aware model choice and hard spending limits.
 - **Memory Vault**: what Maverick knows about you, where each memory came from, how long it's kept. Edit, delete or export anything.
 - **Goals & tasks** with priorities, due dates and reminders.
@@ -14,7 +21,7 @@ A private AI chief of staff and strategic advisor for Oliver. It runs on your Ma
 
 - **Voice**: tap the mic and talk; Maverick answers out loud in a British voice (built into your Mac/iPhone, free).
 
-**What it can't do (yet):** a premium voice, a "Hey Maverick" wake word, sending email or messages, changing your calendar, buying, booking, posting, moving money. Maverick knows this and won't claim otherwise. The plan is in `PROGRESS.md`.
+**What it can't do (yet):** a premium voice, a "Hey Maverick" wake word, sending email or messages, changing your calendar, live bank feeds, wearables, buying, booking, posting, moving money. There is no tool for any of these, in any autonomy mode. Maverick knows this and won't claim otherwise. The plan is in `PROGRESS.md`.
 
 ---
 
@@ -167,13 +174,25 @@ Disconnect any time in Settings; it also revokes Maverick's access at Google.
 
 | Screen | What it does |
 |---|---|
-| Command Center | Live day overview: clock and day progress, next event countdown, 7-day stats with trends (tasks, focus, streak, spend), focus timer, "Maverick noticed" insights, today's timeline, priorities with quick add, goal progress, 14-day activity charts, suggestion inbox |
-| Conversation | Chat. Each reply shows the model, why it was chosen, and the cost. **Context used** shows which memories Maverick saw and why. Suggestions appear as chips with Accept/✕. |
-| Goals & Tasks | Inbox, tasks (priority, due date, reminder, linked goal), goals with measurable outcomes |
-| Memory Vault | Search, add, edit, pin, delete; retention per memory; provenance for each; export |
-| Usage & Budget | Spend by day and model |
-| Security | Signed-in devices, connected accounts with their exact permissions, audit log |
-| Settings | Calendar, notifications, daily rhythm and proactivity, personality, "About me", budget, model routing, data export, password |
+| **Top bar** | Live core (idle / listening / thinking / executing / alert / complete), search & commands (⌘K), system health, clock, autonomy mode, approvals, voice command, **E-STOP** |
+| 01 Command Center | Command line, live core, today's mission, priorities, live activity, upcoming, recommendations, focus, stats, goals, analytics, workflows, telemetry. "Customise panels" hides what you don't use (per device) |
+| 02 Intelligence | Conversation with Maverick (text, voice, files) |
+| 03 Mission Control | Launch missions, approve or reject steps, watch them run, read reports |
+| 04 Agent Operations | The seven agents, their tools, risk levels and results |
+| 05 Daily Ops | Today and tomorrow: calendar, due tasks, focus |
+| 06 Projects & Goals | Goals, tasks, suggestion inbox |
+| 07 Finance | Bank CSV import, categories, budgets, recurring and unusual charges |
+| 08 Health & Performance | Workout, sleep, weight and energy logs and trends |
+| 09 Communications | Email drafts; "Open in Mail" to send them yourself |
+| 10 Research | Sourced web research briefs (needs the live model) |
+| 11 Automations | Recurring missions |
+| 12 Logs | Agent execution log and the audit log |
+| Permissions | Autonomy mode, per-tool permissions, limits, emergency stop |
+| Memory Vault, Files, Usage, Security, Settings | As before |
+
+**Autonomy modes** (Permissions): **1 Advisory** reads and recommends, changes nothing. **2 Assisted** (default) reads on its own and asks before every change. **3 Autonomous** makes low-risk changes inside Maverick (tasks, reminders, drafts) on its own, up to 20 a day. **4 Autopilot** also runs medium-risk tools you've allowed. High-risk actions always ask, and the dangerous ones (sending, paying, deleting) don't exist at all.
+
+**Importing bank data:** in your online bank, export the account's transactions as CSV, then Finance → **Import bank CSV**. Importing the same file twice adds nothing twice.
 
 **Budget defaults:** at $30/month Maverick warns and switches to the cheapest model; it stops at $40/month or $5/day. Briefings never fail on budget: they fall back to a free version built from your data.
 

@@ -101,11 +101,15 @@ function useTip() {
 const FORMATS = {
   int: (v: number) => String(Math.round(v)),
   usd: (v: number) => (v === 0 ? "$0" : v < 0.1 ? `$${v.toFixed(3)}` : `$${v.toFixed(2)}`),
+  nok: (v: number) => (Math.abs(v) >= 10000 ? `${Math.round(v / 1000)}k` : String(Math.round(v))),
+  dec: (v: number) => (Math.round(v * 10) / 10).toString(),
 };
+const monthName = (iso: string) => new Intl.DateTimeFormat("en-GB", { month: "short", year: "2-digit", timeZone: "UTC" }).format(new Date(`${iso.slice(0, 7)}-15T12:00:00Z`));
 
 /** Daily column chart (one series). Title names the measure, so no legend. */
-export function ColumnChart({ data, unit, valueFormat = "int", height = 150 }: { data: { date: string; value: number }[]; unit: string; valueFormat?: keyof typeof FORMATS; height?: number }) {
+export function ColumnChart({ data, unit, valueFormat = "int", height = 150, labelFormat = "day", lastLabel }: { data: { date: string; value: number }[]; unit: string; valueFormat?: keyof typeof FORMATS; height?: number; labelFormat?: "day" | "month"; lastLabel?: string }) {
   const format = FORMATS[valueFormat];
+  const label = (iso: string) => (labelFormat === "month" ? monthName(iso) : shortDate(iso));
   const { tip, setTip } = useTip();
   const [table, setTable] = useState(false);
   const W = 560;
@@ -127,8 +131,8 @@ export function ColumnChart({ data, unit, valueFormat = "int", height = 150 }: {
       <div>
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Day</th><th className="num">{unit}</th></tr></thead>
-            <tbody>{data.map((d) => <tr key={d.date}><td>{shortDate(d.date)}</td><td className="num">{format(d.value)}</td></tr>)}</tbody>
+            <thead><tr><th>{labelFormat === "month" ? "Month" : "Day"}</th><th className="num">{unit}</th></tr></thead>
+            <tbody>{data.map((d) => <tr key={d.date}><td>{label(d.date)}</td><td className="num">{format(d.value)}</td></tr>)}</tbody>
           </table>
         </div>
         <div className="chart-foot"><span /><button className="linkish" onClick={() => setTable(false)}>Show chart</button></div>
@@ -149,8 +153,10 @@ export function ColumnChart({ data, unit, valueFormat = "int", height = 150 }: {
             <text key={t} x={padL - 6} y={padT + plotH - (t / max) * plotH + 3} textAnchor="end">{format(t)}</text>
           ))}
           {data.map((d, i) =>
-            i % 2 === data.length % 2 || i === data.length - 1 ? (
-              <text key={d.date} x={padL + i * slot + slot / 2} y={H - 6} textAnchor="middle">{i === data.length - 1 ? "Today" : weekday(d.date).slice(0, 2)}</text>
+            labelFormat === "month" || i % 2 === data.length % 2 || i === data.length - 1 ? (
+              <text key={d.date} x={padL + i * slot + slot / 2} y={H - 6} textAnchor="middle">
+                {i === data.length - 1 ? (lastLabel ?? (labelFormat === "month" ? "Now" : "Today")) : labelFormat === "month" ? monthName(d.date).slice(0, 3) : weekday(d.date).slice(0, 2)}
+              </text>
             ) : null,
           )}
         </g>
@@ -168,7 +174,7 @@ export function ColumnChart({ data, unit, valueFormat = "int", height = 150 }: {
                 height={plotH}
                 onMouseEnter={(e) => {
                   const box = (e.currentTarget.ownerSVGElement as SVGSVGElement).getBoundingClientRect();
-                  setTip({ x: ((x + bw / 2) / W) * box.width, y: ((padT + plotH - h) / H) * box.height, content: <><b>{format(d.value)}</b> {unit} · {shortDate(d.date)}</> });
+                  setTip({ x: ((x + bw / 2) / W) * box.width, y: ((padT + plotH - h) / H) * box.height, content: <><b>{format(d.value)}</b> {unit} · {label(d.date)}</> });
                 }}
               />
               {d.value > 0 ? <path className={`bar${isLast ? "" : " dim"}`} d={barPath(x, padT + plotH - h, bw, h)} pointerEvents="none" /> : null}
@@ -178,7 +184,7 @@ export function ColumnChart({ data, unit, valueFormat = "int", height = 150 }: {
       </svg>
       {tip && <div className="chart-tip" style={{ left: tip.x, top: tip.y }}>{tip.content}</div>}
       <div className="chart-foot">
-        <span>Hover a day for details</span>
+        <span>Hover a {labelFormat === "month" ? "month" : "day"} for details</span>
         <button className="linkish" onClick={() => setTable(true)}>Show as table</button>
       </div>
     </div>

@@ -1,8 +1,8 @@
 # Maverick: progress log
 
-## Status: Milestone 6 (UX overhaul) built and tested. Cloud deployment ready for Oliver.
+## Status: Milestone 7 (command system redesign) built and tested.
 
-Last updated: 2026-10-24 · Code: https://github.com/olivermikaelhochheim-maker/-Maverick
+Last updated: 2026-11-05 · Code: https://github.com/olivermikaelhochheim-maker/-Maverick
 
 Milestone order (agreed with Oliver 2026-10-24): **Chief of Staff core** (old Phase 3 + read-only Google Calendar from Phase 4) came before voice, because Oliver's priorities are proactive thinking, suggestions and accountability.
 
@@ -63,7 +63,30 @@ Single-user auth, streaming chat, model routing (Haiku/Sonnet/Opus 5.5), hard bu
 - **Chat**: starters built from your day, orb avatar, Copy / Read aloud on replies
 - Nav counters, toasts, entrance motion (respects reduced motion); chart colours validated for the navy surface (dataviz validator)
 
-## Test results (2026-10-24, Linux cloud container)
+### Milestone 7: Command system redesign (2026-11-05)
+Plan and audit: `docs/redesign/AUDIT-AND-ARCHITECTURE.md`. Decisions: ADR 0014.
+- **Agent engine**: missions with fixed plans (6 templates, or the AI planner restricted to registered tools), per-step autonomy policy, atomic execution with timeouts, retries and restart recovery, approvals, encrypted execution log, automations, emergency stop, per-mission cost cap
+- **Seven agents** (Command, Operations, Intelligence, Finance, Performance, Communications, System) as permission scopes over 14 tools; no send/pay/buy/book/post/delete tool exists
+- **Four autonomy modes** + per-tool overrides + daily cap; Permissions screen
+- **Finance**: Norwegian bank CSV import (DNB/SpareBank 1/Sbanken formats, comma decimals, Inn/Ut columns, BOM, Windows-1252), idempotent re-import, auto-categories + learned rules, budgets with pace, recurring and anomaly detection, all from real rows
+- **Health**: workout/sleep/weight/energy logs, weekly trends, training streak
+- **Communications**: email drafts (AI-written in live mode, template in mock), hand-off via mailto; never sent by Maverick
+- **Research**: web search through Claude's server tool, sources listed (live model only; honestly skipped in mock)
+- **Design system v3**: midnight/graphite, electric cyan, tactical blue, emerald, amber, red; mono telemetry; HUD panels with corner brackets; tactical grid; chart palette re-validated for the new surface
+- **Shell**: command bar (live core, health lights, clock, mode, approvals, voice, E-STOP), 12-item nav + System section, intelligence panel (status, approvals, background, live activity), mobile tab bar + More
+- **Live core** bound to real state: engine (executing/alert/complete) + browser (mic listening, chat thinking); reduced motion respected
+- **13 screens**: Command Center (customisable panels), Intelligence, Mission Control + mission view, Agent Operations, Daily Ops, Projects & Goals, Finance, Health, Communications, Research, Automations, Logs, Permissions
+- **Voice commands**: "Maverick, prepare tomorrow's briefing" launches the mission; anything else opens a conversation
+- Export/import now include finance, health and drafts
+
+## Test results (2026-11-05, Linux cloud container)
+| Suite | Result |
+|---|---|
+| TypeScript typecheck (core + web) | ✅ pass |
+| Core unit + integration (Vitest) | ✅ 168 / 168 (30 new: policy table, every mode, approvals, bulk changes, overrides, E-STOP, restart recovery, AI planner validation, web research, automations, CSV parsing, finance intelligence, health trends, drafts) |
+| Browser end-to-end (Playwright; iPhone 15 + desktop) | ✅ 60 passed, 2 skipped by design (14 new: approval flow, Advisory, E-STOP, voice command, CSV import, health log, drafts; every screen checked for sideways scrolling) |
+
+## Earlier test results (2026-10-24)
 | Suite | Result |
 |---|---|
 | TypeScript typecheck (core + web) | ✅ pass |
@@ -106,6 +129,9 @@ The blueprint's exact behaviour on Render (field names, generated-value format, 
 
 ## Monthly cost estimate
 Typical ~$10 (chat ~$8 + briefings ~$1.20 + extra context ~$0.60); light ~$3; heavy capped at $40. Hosting $0 (Mac), Google API $0, push $0. Details: `docs/budget.md`.
+
+## ⚠️ Not yet verified: the command system with the live model
+AI-planned missions, AI-written reports and drafts, and web research are tested against a scripted model, not real Claude. First live test: Mission Control → Research brief, then a custom objective.
 
 ## Next milestones (proposed)
 **3b. Premium voice:** a natural neural British voice through one vendor (Azure / OpenAI / ElevenLabs; ~$4–12/month typical), chosen after Oliver hears samples. Then an opt-in local "Hey Maverick" wake word on the Mac.

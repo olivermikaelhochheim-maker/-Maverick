@@ -181,6 +181,7 @@ export class MissionEngine {
   readonly health: HealthStore;
   readonly drafts: DraftStore;
   private busy = new Set<string>();
+  private again = new Set<string>();
   private controllers = new Map<string, AbortController>();
   private timer: ReturnType<typeof setInterval> | null = null;
 
@@ -237,18 +238,22 @@ export class MissionEngine {
   }
 
   /** Run steps for one user until nothing more can run now. Used by the loop and by tests. */
-  async advanceUser(userId: string, now = new Date()): Promise<void> {
-    if (this.busy.has(userId)) return;
+  async advanceUser(userId: string, now?: Date): Promise<void> {
+    if (this.busy.has(userId)) {
+      this.again.add(userId); // something changed mid-run: go round once more when done
+      return;
+    }
     this.busy.add(userId);
     try {
       for (let guard = 0; guard < 40; guard++) {
         const { rows } = await this.db.query<{ id: string }>(`SELECT id FROM missions WHERE user_id = $1 AND status = 'running' ORDER BY priority, created_at LIMIT 1`, [userId]);
         if (!rows[0]) return;
-        const progressed = await this.advanceMission(userId, rows[0].id, now);
+        const progressed = await this.advanceMission(userId, rows[0].id, now ?? new Date());
         if (!progressed) return;
       }
     } finally {
       this.busy.delete(userId);
+      if (this.again.delete(userId)) this.kick(userId);
     }
   }
 

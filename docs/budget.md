@@ -38,6 +38,11 @@ Pay-per-use only. A 10-page PDF ≈ 20k tokens: ≈ $0.04 for the first question
 ## Cloud hosting (Render)
 Starter web service ~$7 + 1 GB disk ~$0.25 = **~$7.25/month** (third-party price pages, Nov 2026; verify on render.com/pricing). Typical total: **~$17/month** (Claude ~$10 + hosting ~$7.25).
 
+## Missions (redesign, 2026-11)
+Template missions with the live model cost one short report-writing call: about $0.003–0.01 on Sonnet 5.5. A model-planned custom mission adds a planning call (~$0.005). Drafting an email ≈ $0.005. A web research brief: model tokens (~$0.02–0.05) plus up to 5 searches at $0.01 each, so **$0.05–0.15**. Each mission is capped at $0.50 by default (Permissions → Limits) on top of the monthly and daily caps. In mock mode missions cost nothing.
+
+Typical use (a daily "Prepare me for tomorrow" automation, a weekly review, two research briefs a week): roughly **$1–2/month** extra.
+
 ## Later phases (planning ranges, *unverified*)
 
 | Item | Phase | Rough monthly |

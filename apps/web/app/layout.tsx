@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./design.css";
+import "./hud.css";
 
 export const metadata: Metadata = {
   title: "Maverick",
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#090e18",
+  themeColor: "#05070b",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",

@@ -1,18 +1,19 @@
 /* =====================================================================
    Maverick design layer v2: livelier, data-rich, same navy/cyan palette.
-   Loaded after globals.css. Chart colours validated for the navy surface
+   Loaded after globals.css. Chart colours re-validated 2026-11-05 for the graphite surface #0b1018
    (dataviz validator: lightness band, chroma, CVD, contrast).
    ===================================================================== */
 :root {
   --chart-1: #21a3b6; /* deep cyan: data marks (brand cyan is too light for marks) */
   --chart-2: #d95926; /* orange */
   --chart-3: #9085e9; /* violet */
-  --chart-muted: #2b3b57;
-  --grid: #1c2840;
+  --chart-muted: #24344b;
+  --grid: #162030;
+  --grid-line: #0d141d;
   --status-good: #0ca30c;
   --status-warning: #fab219;
   --status-critical: #d03b3b;
-  --glass: linear-gradient(180deg, #13203a 0%, #0f1828 100%);
+  --glass: linear-gradient(180deg, #0d141e 0%, #090d14 100%);
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 

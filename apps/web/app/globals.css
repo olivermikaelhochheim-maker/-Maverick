@@ -1,34 +1,47 @@
 /* Maverick design tokens: dark navy/charcoal with restrained cyan accents.
    Contrast ratios on --bg: --text 15:1, --muted 7:1, --accent 10:1. */
 :root {
+  /* v3 "command system": midnight black and graphite, electric cyan, tactical blue,
+     emerald, amber, controlled red. Contrast on --bg: --text 16:1, --muted 7.4:1, --accent 11:1. */
   color-scheme: dark;
-  --bg: #090e18;
-  --bg-elev: #0e1524;
-  --panel: #111a2b;
-  --panel-2: #16213573;
-  --border: #1f2c42;
-  --border-strong: #2b3b57;
-  --text: #e7eef6;
-  --muted: #8d9db3;
-  --faint: #5d6d85;
+  --bg: #05070b;
+  --bg-elev: #080b11;
+  --panel: #0b1018;
+  --panel-2: #0f1520;
+  --border: #172130;
+  --border-strong: #24344b;
+  --text: #e6edf5;
+  --muted: #8d9db2;
+  --faint: #65758b;
   --accent: #3fd8ea;
-  --accent-soft: #3fd8ea22;
-  --accent-ink: #032129;
-  --ok: #4fd1a5;
-  --warn: #f2b84b;
-  --danger: #ff7a7a;
-  --radius: 14px;
-  --radius-sm: 9px;
+  --accent-soft: #3fd8ea1c;
+  --accent-ink: #021a20;
+  --blue: #5b9dff;
+  --blue-soft: #5b9dff1f;
+  --ok: #34d399;
+  --ok-soft: #34d3991c;
+  --warn: #f5b544;
+  --warn-soft: #f5b5441c;
+  --danger: #ff6464;
+  --danger-soft: #ff646420;
+  --radius: 6px;
+  --radius-sm: 5px;
   --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Inter, Roboto, sans-serif;
-  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --nav-w: 232px;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --nav-w: 244px;
+  --intel-w: 312px;
+  --cmdbar-h: 52px;
   --tabbar-h: 64px;
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
-  background: radial-gradient(1200px 600px at 70% -10%, #10213a 0%, transparent 60%), var(--bg);
+  background:
+    radial-gradient(1100px 520px at 60% -12%, #0c2a3a55 0%, transparent 60%),
+    linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0 / 48px 48px,
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0 / 48px 48px,
+    var(--bg);
   background-attachment: fixed;
   color: var(--text);
   font-family: var(--font);
@@ -62,7 +75,7 @@ pre { background: #060a12; border: 1px solid var(--border); border-radius: var(-
   border: 1px solid var(--border-strong); background: var(--panel); color: var(--text);
   font: inherit; font-weight: 500; cursor: pointer; transition: background 0.15s, border-color 0.15s;
 }
-.btn:hover { background: #182540; border-color: #3a4f72; text-decoration: none; }
+.btn:hover { background: #111a27; border-color: #33496a; text-decoration: none; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
 .btn-primary:hover { background: #6ae4f1; border-color: #6ae4f1; }
@@ -73,7 +86,7 @@ pre { background: #060a12; border: 1px solid var(--border); border-radius: var(-
 
 label { display: block; font-size: 0.9rem; color: var(--muted); margin-bottom: 0.3rem; }
 input, textarea, select {
-  width: 100%; font: inherit; color: var(--text); background: #0a111e;
+  width: 100%; font: inherit; color: var(--text); background: #070b11;
   border: 1px solid var(--border-strong); border-radius: var(--radius-sm); padding: 0.65rem 0.8rem; min-height: 44px;
 }
 textarea { resize: vertical; line-height: 1.5; }
@@ -125,7 +138,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); outline
 
 .cards > * { min-width: 0; }
 .cards > .card + .card { margin-top: 0; }
-.card { min-width: 0; background: linear-gradient(180deg, #121c2f 0%, #0f1727 100%); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.2rem; }
+.card { min-width: 0; background: linear-gradient(180deg, #0c121bf2 0%, #090d14f2 100%); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.1rem 1.2rem; position: relative; }
 .card + .card { margin-top: 1rem; }
 .cards { display: grid; grid-template-columns: repeat(12, 1fr); gap: 1rem; }
 .span-4 { grid-column: span 4; } .span-5 { grid-column: span 5; } .span-7 { grid-column: span 7; } .span-6 { grid-column: span 6; } .span-8 { grid-column: span 8; } .span-12 { grid-column: span 12; }
@@ -180,7 +193,7 @@ td { padding: 0.55rem 0.5rem; border-bottom: 1px solid var(--border); vertical-a
 .chat-scroll { flex: 1; overflow-y: auto; padding: 1.5rem 1.2rem; overscroll-behavior: contain; }
 .chat-inner { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.1rem; }
 .msg { max-width: 100%; }
-.msg-user { align-self: flex-end; background: #17243b; border: 1px solid var(--border-strong); padding: 0.65rem 0.95rem; border-radius: 16px 16px 4px 16px; max-width: 85%; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg-user { align-self: flex-end; background: #0f1a28; border: 1px solid var(--border-strong); padding: 0.65rem 0.95rem; border-radius: 16px 16px 4px 16px; max-width: 85%; white-space: pre-wrap; overflow-wrap: anywhere; }
 .msg-assistant { align-self: stretch; overflow-wrap: anywhere; }
 .msg-assistant .who { display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; color: var(--faint); margin-bottom: 0.25rem; letter-spacing: 0.06em; }
 .msg-assistant .body p:last-child { margin-bottom: 0; }
@@ -191,7 +204,7 @@ td { padding: 0.55rem 0.5rem; border-bottom: 1px solid var(--border); vertical-a
 @keyframes blink { 50% { opacity: 0; } }
 .composer { border-top: 1px solid var(--border); padding: 0.75rem 1.2rem calc(0.75rem + env(safe-area-inset-bottom)); background: #070b14ee; }
 .composer-inner { max-width: 760px; margin: 0 auto; }
-.composer-box { display: flex; gap: 0.5rem; align-items: flex-end; background: #0a111e; border: 1px solid var(--border-strong); border-radius: 16px; padding: 0.4rem; }
+.composer-box { display: flex; gap: 0.5rem; align-items: flex-end; background: #070b11; border: 1px solid var(--border-strong); border-radius: 16px; padding: 0.4rem; }
 .composer-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .composer textarea { border: none; background: transparent; min-height: 44px; max-height: 40vh; resize: none; box-shadow: none; padding: 0.6rem; }
 .composer textarea:focus { box-shadow: none; }
