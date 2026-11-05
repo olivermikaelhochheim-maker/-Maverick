@@ -5,6 +5,7 @@ import { getMaverick } from "./maverick";
 import {
   SESSION_COOKIE,
   UserFacingError,
+  isUserFacing,
   requireTwoFactor,
   log,
   validateSession,
@@ -53,7 +54,7 @@ export function json(data: unknown, status = 200): Response {
 }
 
 export function errorResponse(err: unknown): Response {
-  if (err instanceof UserFacingError) return json({ error: err.message, code: err.code }, err.status);
+  if (isUserFacing(err)) return json({ error: err.message, code: err.code }, err.status);
   log.error("api_error", { error: err as Error });
   return json({ error: "Something went wrong on Maverick's side. The error was logged.", code: "internal" }, 500);
 }

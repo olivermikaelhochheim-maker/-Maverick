@@ -37,3 +37,4 @@ export * from "./agent";
 export * from "./finance";
 export * from "./health";
 export * from "./drafts";
+export * from "./integrations/ics";

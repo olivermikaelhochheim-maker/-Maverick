@@ -17,7 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     m.agent.approvals(user.id),
     m.agent.events(user.id, { limit: 12 }),
   ]);
-  const initial = JSON.parse(JSON.stringify({ status, approvals, events, live: m.providers.mode === "live", calendar: m.calendarMode }));
+  const initial = JSON.parse(JSON.stringify({ status, approvals, events, live: m.providers.mode === "live", calendar: (await m.deps.agenda.links?.info(user.id)) ? "link" : m.calendarMode }));
   const counts = {
     "/planning": { n: pending.length + open.filter((t) => t.dueDate && t.dueDate < today).length, alert: open.some((t) => t.dueDate && t.dueDate < today) },
   };

@@ -142,7 +142,20 @@ The first time, the browser asks for microphone permission. Allow it. Use **Safa
 
 ---
 
-## Connect Google Calendar (read-only, about 20 minutes, once)
+## Connect Google Calendar
+
+### Easiest: private calendar link (2 minutes, no Google Cloud)
+
+1. On a computer, open Google Calendar → ⚙ **Settings**.
+2. Left side, under **Settings for my calendars**, click your calendar (your name).
+3. Scroll to **Integrate calendar** → **Secret address in iCal format** → copy.
+4. In Maverick: **Settings → Google Calendar**, paste it, press **Connect**.
+
+Read-only by nature. Maverick checks the link really returns a calendar before saving it, stores it encrypted, and re-reads it every 5 minutes. Anyone with the link can see your calendar, so don't share it; if it leaks, press **Reset** next to it in Google Calendar and paste the new one. iCloud and Outlook calendar links work too.
+
+### Alternative: Google sign-in (about 20 minutes, once)
+
+Only needed if you prefer signing in with Google over a link.
 
 Google requires every app, even a private one, to have its own sign-in credentials. Maverick asks only for **read-only** calendar access.
 

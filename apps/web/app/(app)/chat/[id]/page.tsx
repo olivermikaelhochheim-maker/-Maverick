@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { UserFacingError } from "@maverick/core";
+import { isUserFacing } from "@maverick/core";
 import { ChatView } from "@/components/ChatView";
 import { getMaverick, requireUser } from "@/lib/server";
 
@@ -11,7 +11,7 @@ export default async function ChatPage({ params }: { params: Promise<{ id: strin
   try {
     messages = await m.chat.conversations.messages(user.id, id);
   } catch (err) {
-    if (err instanceof UserFacingError && err.status === 404) notFound();
+    if (isUserFacing(err) && err.status === 404) notFound();
     throw err;
   }
   const conversations = await m.chat.conversations.list(user.id, 100);

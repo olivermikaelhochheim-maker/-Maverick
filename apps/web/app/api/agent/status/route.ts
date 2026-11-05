@@ -8,7 +8,7 @@ export async function GET(req: Request) {
       maverick.agent.approvals(user.id),
       maverick.agent.events(user.id, { limit: 12 }),
     ]);
-    return json({ status, approvals, events, live: maverick.providers.mode === "live", calendar: maverick.calendarMode });
+    return json({ status, approvals, events, live: maverick.providers.mode === "live", calendar: (await maverick.deps.agenda.links?.info(user.id)) ? "link" : maverick.calendarMode });
   } catch (err) {
     return errorResponse(err);
   }

@@ -145,7 +145,7 @@ export function CommandBar({ mode, tz, onOpenIntel }: { mode: "live" | "mock"; t
       </button>
       <div className="cb-group cb-hide-md" aria-label="System health">
         <span className={`light ${mode === "live" ? "ok" : "warn"}`} title={mode === "live" ? "AI model connected" : "Mock mode: no API key"}><i />AI {mode === "live" ? "live" : "mock"}</span>
-        <span className={`light ${cal === "google" ? "ok" : cal === "mock" ? "warn" : "off"}`} title="Calendar (read-only)"><i />CAL {cal === "google" ? "on" : cal === "mock" ? "demo" : "off"}</span>
+        <span className={`light ${cal === "google" || cal === "link" ? "ok" : cal === "mock" ? "warn" : "off"}`} title="Calendar (read-only)"><i />CAL {cal === "google" || cal === "link" ? "on" : cal === "mock" ? "demo" : "off"}</span>
         <span className={`light ${!online ? "bad" : halted ? "bad" : "ok"}`} title="Mission engine"><i />ENG {!online ? "lost" : halted ? "halt" : "ok"}</span>
       </div>
       <span className="cb-sep cb-hide-md" />

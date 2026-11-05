@@ -30,7 +30,7 @@ export interface LiveStatus {
   }[];
   events: { id: number; missionId: string | null; level: "info" | "success" | "warn" | "error"; kind: string; message: string; createdAt: string }[];
   live: boolean;
-  calendar: "google" | "mock" | "none";
+  calendar: "google" | "link" | "mock" | "none";
 }
 
 interface Ctx {

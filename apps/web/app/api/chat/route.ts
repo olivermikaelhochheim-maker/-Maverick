@@ -1,4 +1,4 @@
-import { UserFacingError, log, ndjsonStream } from "@maverick/core";
+import { UserFacingError, isUserFacing, log, ndjsonStream } from "@maverick/core";
 import { apiUser, errorResponse, readJson } from "@/lib/server";
 
 /**
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
   });
 
   const stream = ndjsonStream<unknown>(events, abort, (err) => {
-    if (err instanceof UserFacingError) return { type: "error", code: err.code, message: err.message };
+    if (isUserFacing(err)) return { type: "error", code: err.code, message: err.message };
     log.error("chat_route_failed", { error: err as Error });
     return { type: "error", code: "internal", message: "Something went wrong on Maverick's side." };
   });

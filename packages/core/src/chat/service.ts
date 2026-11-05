@@ -11,6 +11,7 @@ import type { ProviderSet } from "../llm";
 import { MemoryStore, renderMemories, type MemoryCategory } from "../memory";
 import { PlanningStore } from "../planning";
 import { SuggestionStore } from "../suggestions";
+import { CalendarLinkStore } from "../integrations/ics";
 import { AgendaService } from "../integrations/calendar";
 import { IntegrationStore } from "../integrations/store";
 import { renderState, snapshot } from "../context";
@@ -89,7 +90,7 @@ export function defaultDeps(db: Db, cipher: FieldCipher): ChatDeps {
     memory,
     planning,
     suggestions: new SuggestionStore(db, cipher, memory, planning),
-    agenda: new AgendaService(null, new IntegrationStore(db, cipher)),
+    agenda: new AgendaService(null, new IntegrationStore(db, cipher), new CalendarLinkStore(db, cipher)),
   };
 }
 

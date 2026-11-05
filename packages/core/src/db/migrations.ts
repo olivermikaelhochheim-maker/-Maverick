@@ -442,6 +442,22 @@ export const MIGRATIONS: { id: string; sql: string }[] = [
       CREATE INDEX drafts_user_idx ON drafts(user_id, updated_at DESC);
     `,
   },
+  {
+    id: "0007_calendar_links",
+    sql: `
+      -- A private calendar link (iCal "secret address"): read-only, no Google Cloud setup.
+      -- The link itself grants read access, so it is stored encrypted.
+      CREATE TABLE calendar_links (
+        user_id     TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        url_enc     TEXT NOT NULL,
+        host        TEXT NOT NULL,
+        calendar_name_enc TEXT,
+        last_ok_at  TIMESTAMPTZ,
+        last_error  TEXT,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+    `,
+  },
 ];
 
 export async function migrate(db: Db): Promise<string[]> {

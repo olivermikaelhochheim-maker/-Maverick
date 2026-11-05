@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getSettings, googleConfigProblem, maskClientId } from "@maverick/core";
 import { LogoutButton } from "@/components/AuthForms";
 import { CalendarPanel } from "@/components/CalendarPanel";
+import { CalendarLinkPanel } from "@/components/CalendarLinkPanel";
 import { NotificationsPanel } from "@/components/NotificationsPanel";
 import { VoicePanel } from "@/components/VoicePanel";
 import { ImportPanel } from "@/components/ImportPanel";
@@ -13,6 +14,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const m = await getMaverick();
   const settings = await getSettings(m.db, m.cipher, user.id);
   const google = await m.integrations.get(user.id, "google");
+  const calLink = (await m.deps.agenda.links?.info(user.id)) ?? null;
   const { welcome, google: googleFlash } = await searchParams;
   return (
     <div className="page">
@@ -36,12 +38,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       <div className="cards" style={{ marginBottom: "1rem" }}>
         <section className="card span-6" id="calendar" aria-labelledby="h-cal">
           <h2 id="h-cal">Google Calendar</h2>
-          <CalendarPanel
+          {m.calendarMode !== "mock" && <CalendarLinkPanel initial={calLink ? JSON.parse(JSON.stringify(calLink)) : null} />}
+          {!calLink && m.calendarMode !== "none" && <hr style={{ border: 0, borderTop: "1px solid var(--border)", margin: "1rem 0" }} />}
+          {!calLink && m.calendarMode !== "none" && <CalendarPanel
             mode={m.calendarMode}
             connected={google ? { email: google.accountEmail, status: google.status, scopes: google.scopes } : null}
             flash={googleFlash}
             setup={m.google ? { clientId: maskClientId(m.google.clientId), redirectUri: m.google.redirectUri, problem: googleConfigProblem(m.google) } : null}
-          />
+          />}
         </section>
         <section className="card span-6" aria-labelledby="h-notif">
           <h2 id="h-notif">Notifications on this device</h2>

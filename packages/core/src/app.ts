@@ -6,6 +6,7 @@ import { ChatService, defaultDeps, type ChatDeps } from "./chat/service";
 import { AgendaService, MockCalendarSource, type CalendarSource } from "./integrations/calendar";
 import { GoogleCalendarSource, googleConfig, type GoogleConfig } from "./integrations/google";
 import { IntegrationStore } from "./integrations/store";
+import { CalendarLinkStore } from "./integrations/ics";
 import { Notifier, loadOrCreateVapid } from "./notify";
 import { BriefingService } from "./briefing";
 import { Scheduler } from "./scheduler";
@@ -51,7 +52,7 @@ export async function createMaverick(opts: { db?: Db; dataKey?: string; provider
   const google = googleConfig();
   const cal = calendarSource(integrations, google);
   const base = defaultDeps(db, cipher);
-  const deps: ChatDeps = { ...base, agenda: new AgendaService(cal.source, integrations) };
+  const deps: ChatDeps = { ...base, agenda: new AgendaService(cal.source, integrations, new CalendarLinkStore(db, cipher)) };
   const notifier = new Notifier(db, cipher, await loadOrCreateVapid(db, cipher));
   const briefings = new BriefingService(db, cipher, providers, deps, notifier);
   const agent = new MissionEngine(db, cipher, providers, deps, notifier);
