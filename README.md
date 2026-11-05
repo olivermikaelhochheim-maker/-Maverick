@@ -213,6 +213,9 @@ Your data is in `~/maverick/data/` plus the encryption key (Keychain or `.env`).
 | No notifications on iPhone | Opened from the home-screen icon? Via the Tailscale **https** address? "Allow push notifications" ticked and saved? Try **Send a test**. |
 | "Cross-site request blocked" via Tailscale | Set `MAVERICK_ALLOWED_ORIGINS` (iPhone section, step 4) and restart |
 | Google: "Access blocked" or a 7-day expiry | Consent screen must be **In production**, your address listed as a test user, and the redirect URI exact |
+| Maverick says "Email or password is incorrect" | Check the email first: `pnpm reset-password` shows which address the account uses. Forgot the password? Stop Maverick (Ctrl+C), run `pnpm reset-password` in the maverick folder, then `pnpm start` again |
+| "Too many failed attempts" | Wait 15 minutes, or run `pnpm reset-password` (it also clears the lockout) |
+| **Google** says "Wrong password" while connecting the calendar | That's your Google account password, not Maverick's. Use Google's "Forgot password?" link |
 | "port 3000 already in use" | Maverick is already running in another Terminal window |
 
 Never run two copies of Maverick at once: the embedded database allows one at a time.

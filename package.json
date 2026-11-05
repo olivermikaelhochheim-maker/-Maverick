@@ -13,6 +13,7 @@
     "test": "pnpm --filter @maverick/core test",
     "test:e2e": "pnpm --filter @maverick/web test:e2e",
     "typecheck": "pnpm -r typecheck",
-    "check": "node scripts/doctor.mjs"
+    "check": "node scripts/doctor.mjs",
+    "reset-password": "node scripts/reset-password.mjs"
   }
 }
