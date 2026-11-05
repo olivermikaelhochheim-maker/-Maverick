@@ -33,3 +33,7 @@ export * from "./files";
 export * from "./focus";
 export * from "./dashboard";
 export { parseQuickTask, type QuickTask } from "./quickadd";
+export * from "./agent";
+export * from "./finance";
+export * from "./health";
+export * from "./drafts";

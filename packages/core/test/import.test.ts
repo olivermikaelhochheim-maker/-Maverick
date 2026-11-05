@@ -4,6 +4,9 @@ import { importAll } from "../src/import";
 import { defaultDeps } from "../src/chat/service";
 import { getSettings, updateSettings } from "../src/settings";
 import { collect, freshDb, seedUser, setup, testCipher } from "./helpers";
+import { FinanceStore } from "../src/finance";
+import { HealthStore } from "../src/health";
+import { DraftStore } from "../src/drafts";
 
 describe("moving Maverick: export → import", () => {
   it("restores memories, goals, linked tasks, conversations, settings and spend into a fresh install with a different key", async () => {
@@ -15,6 +18,9 @@ describe("moving Maverick: export → import", () => {
     await depsA.planning.createTask(a.user.id, { title: "Book medical", goalId: goal.id, dueDate: "2026-12-01", priority: 1 });
     await collect(a.chat.send({ user: a.user, text: "Hello there" }));
     await updateSettings(a.db, a.cipher, a.user.id, { timezone: "Europe/Oslo", personality: { wit: "high" } });
+    await new FinanceStore(a.db, a.cipher).add(a.user.id, { date: "2026-11-01", amount: "-129,00", description: "Spotify" });
+    await new HealthStore(a.db, a.cipher).add(a.user.id, { date: "2026-11-01", kind: "workout", value: 50, note: "Legs" });
+    await new DraftStore(a.db, a.cipher).create(a.user.id, { to: "", subject: "Hello", body: "Hi there" }, { writtenBy: "user" });
     const exported = JSON.parse(JSON.stringify(await exportAll(a.db, a.cipher, depsA, a.user)));
 
     // A fresh cloud install: new database, new encryption key.
@@ -22,7 +28,9 @@ describe("moving Maverick: export → import", () => {
     const user = await seedUser(db);
     const cipher = testCipher();
     const counts = await importAll(db, cipher, user.id, exported);
-    expect(counts).toEqual({ memories: 2, goals: 1, tasks: 1, conversations: 1, messages: 2 });
+    expect(counts).toEqual({ memories: 2, goals: 1, tasks: 1, conversations: 1, messages: 2, transactions: 1, healthEntries: 1, drafts: 1 });
+    expect((await new FinanceStore(db, cipher).list(user.id))[0]).toMatchObject({ description: "Spotify", amountMinor: -12900, category: "subscriptions" });
+    expect((await new HealthStore(db, cipher).list(user.id))[0]).toMatchObject({ kind: "workout", value: 50, note: "Legs" });
 
     const deps = defaultDeps(db, cipher);
     const mems = await deps.memory.list(user.id);

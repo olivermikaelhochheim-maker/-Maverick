@@ -262,7 +262,7 @@ export class ChatService {
             reply += "\n\n";
             yield { type: "delta", text: "\n\n" };
           }
-        } else {
+        } else if (ev.type === "done") {
           finished = { usage: ev.usage, stopReason: ev.stopReason };
         }
       }

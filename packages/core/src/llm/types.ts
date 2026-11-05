@@ -43,11 +43,14 @@ export interface ChatRequest {
   documents?: ChatDocument[];
   /** Max tool-use round trips per request (each is another model call). Default 2. */
   maxToolRounds?: number;
+  /** Let the model search the web (Anthropic server tool, billed per search). Results are untrusted data. */
+  webSearch?: { maxUses: number };
 }
 
 export type ChatEvent =
   | { type: "text"; text: string }
   | { type: "tool"; name: string; ok: boolean }
+  | { type: "source"; url: string; title: string }
   | { type: "done"; usage: TokenUsage; stopReason: string; servedBy: string };
 
 export type ProviderErrorKind =

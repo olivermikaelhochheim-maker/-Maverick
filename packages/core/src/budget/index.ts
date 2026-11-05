@@ -105,9 +105,11 @@ export async function recordUsage(
     usage: TokenUsage;
     price: ModelPrice;
     estimated?: boolean;
+    /** Fees not priced per token, e.g. web searches. */
+    extraUsd?: number;
   },
 ): Promise<number> {
-  const cost = costUsd(entry.price, entry.usage);
+  const cost = costUsd(entry.price, entry.usage) + (entry.extraUsd ?? 0);
   await db.query(
     `INSERT INTO usage_events
        (id, user_id, conversation_id, provider, model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, cost_usd, estimated)

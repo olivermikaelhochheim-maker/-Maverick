@@ -77,7 +77,7 @@ export function validateSubscription(raw: unknown): PushSubscriptionJson {
   return { endpoint: url.toString(), keys: { p256dh: keys!.p256dh as string, auth: keys!.auth as string } };
 }
 
-export type NotifyKind = "briefing" | "checkin" | "review" | "reminder" | "test";
+export type NotifyKind = "briefing" | "checkin" | "review" | "reminder" | "test" | "approval" | "mission";
 
 export interface NotifyResult {
   status: "sent" | "failed" | "suppressed";

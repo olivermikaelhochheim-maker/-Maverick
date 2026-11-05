@@ -52,7 +52,25 @@ export interface Settings {
     maxPerDay: number;
   };
   ui: { reduceMotion: boolean };
+  /** The agent engine: how much Maverick may do on his own. */
+  agent: {
+    /** 1 Advisory · 2 Assisted · 3 Autonomous · 4 Autopilot */
+    mode: AutonomyMode;
+    /** Emergency stop: no step runs and no automation launches until resumed. */
+    halted: boolean;
+    /** Max low-risk changes per day made without asking (modes 3-4). */
+    dailyAutoActions: number;
+    /** Max steps in one mission plan. */
+    maxSteps: number;
+    /** Max model spend per mission (USD). */
+    missionCostUsd: number;
+    /** Per-tool override. "approve" and "off" tighten; "auto" loosens a low or medium tool only. */
+    toolOverrides: Record<string, ToolOverride>;
+  };
 }
+
+export type AutonomyMode = 1 | 2 | 3 | 4;
+export type ToolOverride = "auto" | "approve" | "off";
 
 /**
  * Seeded from Oliver's initial brief (2026-10-24). These are facts Oliver
@@ -91,18 +109,23 @@ export const DEFAULT_SETTINGS: Settings = {
   proactive: { morningBriefing: true, eveningCheckIn: true, weeklyReview: true, suggestFromChat: true },
   notifications: { enabled: false, maxPerDay: 6 },
   ui: { reduceMotion: false },
+  agent: { mode: 2, halted: false, dailyAutoActions: 20, maxSteps: 12, missionCostUsd: 0.5, toolOverrides: {} },
 };
 
 function isObj(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
+/** Free-form maps that are replaced as a whole rather than merged key by key. */
+const RECORD_KEYS = new Set(["toolOverrides"]);
+
 /** Deep-merge stored settings over defaults so new fields get sane values. */
 function merge<T>(base: T, over: unknown): T {
   if (!isObj(base) || !isObj(over)) return (over === undefined ? base : (over as T));
   const out: Record<string, unknown> = { ...base };
   for (const [k, v] of Object.entries(over)) {
-    if (k in out) out[k] = merge((base as Record<string, unknown>)[k], v);
+    if (RECORD_KEYS.has(k) && isObj(v)) out[k] = { ...v };
+    else if (k in out) out[k] = merge((base as Record<string, unknown>)[k], v);
   }
   return out as T;
 }
@@ -143,6 +166,13 @@ export function validateSettings(s: Settings): Settings {
   if (typeof s.notifications.enabled !== "boolean") fail("Invalid notification setting.");
   num(s.notifications.maxPerDay, 0, 50, "Notifications per day");
   if (typeof s.ui.reduceMotion !== "boolean") fail("Invalid motion setting.");
+  if (![1, 2, 3, 4].includes(s.agent.mode)) fail("Autonomy mode must be 1-4.");
+  if (typeof s.agent.halted !== "boolean") fail("Invalid emergency-stop setting.");
+  num(s.agent.dailyAutoActions, 0, 200, "Daily automatic actions");
+  num(s.agent.maxSteps, 1, 20, "Max steps per mission");
+  num(s.agent.missionCostUsd, 0, 5, "Max cost per mission");
+  if (!isObj(s.agent.toolOverrides)) fail("Invalid tool permissions.");
+  for (const v of Object.values(s.agent.toolOverrides)) if (!["auto", "approve", "off"].includes(v as string)) fail("Tool permission must be auto, approve or off.");
   return s;
 }
 

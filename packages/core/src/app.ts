@@ -9,6 +9,7 @@ import { IntegrationStore } from "./integrations/store";
 import { Notifier, loadOrCreateVapid } from "./notify";
 import { BriefingService } from "./briefing";
 import { Scheduler } from "./scheduler";
+import { MissionEngine } from "./agent/engine";
 
 export interface Maverick {
   db: Db;
@@ -22,6 +23,7 @@ export interface Maverick {
   notifier: Notifier;
   briefings: BriefingService;
   scheduler: Scheduler;
+  agent: MissionEngine;
 }
 
 /**
@@ -52,6 +54,7 @@ export async function createMaverick(opts: { db?: Db; dataKey?: string; provider
   const deps: ChatDeps = { ...base, agenda: new AgendaService(cal.source, integrations) };
   const notifier = new Notifier(db, cipher, await loadOrCreateVapid(db, cipher));
   const briefings = new BriefingService(db, cipher, providers, deps, notifier);
+  const agent = new MissionEngine(db, cipher, providers, deps, notifier);
   return {
     db,
     cipher,
@@ -63,6 +66,7 @@ export async function createMaverick(opts: { db?: Db; dataKey?: string; provider
     notifier,
     briefings,
     chat: new ChatService(db, cipher, providers, deps),
-    scheduler: new Scheduler(db, cipher, deps, briefings, notifier),
+    scheduler: new Scheduler(db, cipher, deps, briefings, notifier, agent),
+    agent,
   };
 }

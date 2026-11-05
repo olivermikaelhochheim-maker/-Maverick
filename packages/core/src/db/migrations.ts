@@ -296,6 +296,152 @@ export const MIGRATIONS: { id: string; sql: string }[] = [
       CREATE INDEX focus_sessions_user_idx ON focus_sessions(user_id, started_at DESC);
     `,
   },
+  {
+    id: "0006_agent_engine_and_domains",
+    sql: `
+      -- Recurring missions. Created only by Oliver.
+      CREATE TABLE automations (
+        id            TEXT PRIMARY KEY,
+        user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        template      TEXT NOT NULL,
+        params_enc    TEXT NOT NULL,
+        title_enc     TEXT NOT NULL,
+        cadence       TEXT NOT NULL CHECK (cadence IN ('daily', 'weekdays', 'weekly')),
+        at_time       TEXT NOT NULL,
+        weekday       INTEGER CHECK (weekday BETWEEN 0 AND 6),
+        enabled       BOOLEAN NOT NULL DEFAULT true,
+        last_run_date TEXT,
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      CREATE INDEX automations_user_idx ON automations(user_id);
+
+      -- A mission: an objective, a fixed plan (steps), its execution and its report.
+      CREATE TABLE missions (
+        id            TEXT PRIMARY KEY,
+        user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        template      TEXT NOT NULL,
+        title_enc     TEXT NOT NULL,
+        objective_enc TEXT NOT NULL,
+        criteria_enc  TEXT,
+        status        TEXT NOT NULL CHECK (status IN ('proposed', 'running', 'awaiting_approval', 'paused', 'completed', 'failed', 'cancelled')),
+        mode          INTEGER NOT NULL CHECK (mode BETWEEN 1 AND 4),
+        priority      INTEGER NOT NULL DEFAULT 2 CHECK (priority BETWEEN 1 AND 3),
+        deadline      DATE,
+        goal_id       TEXT REFERENCES goals(id) ON DELETE SET NULL,
+        source        TEXT NOT NULL CHECK (source IN ('user', 'voice', 'chat', 'automation')),
+        automation_id TEXT REFERENCES automations(id) ON DELETE SET NULL,
+        planner       TEXT NOT NULL DEFAULT 'template',
+        report_enc    TEXT,
+        cost_usd      NUMERIC(12, 6) NOT NULL DEFAULT 0,
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+        started_at    TIMESTAMPTZ,
+        finished_at   TIMESTAMPTZ,
+        updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      CREATE INDEX missions_user_idx ON missions(user_id, created_at DESC);
+      CREATE INDEX missions_status_idx ON missions(status);
+
+      CREATE TABLE mission_steps (
+        id          TEXT PRIMARY KEY,
+        mission_id  TEXT NOT NULL REFERENCES missions(id) ON DELETE CASCADE,
+        user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        idx         INTEGER NOT NULL,
+        agent       TEXT NOT NULL,
+        tool        TEXT NOT NULL,
+        title_enc   TEXT NOT NULL,
+        input_enc   TEXT NOT NULL,
+        risk        TEXT NOT NULL CHECK (risk IN ('read', 'low', 'medium', 'high')),
+        status      TEXT NOT NULL CHECK (status IN ('pending', 'awaiting_approval', 'recommended', 'running', 'done', 'failed', 'skipped')),
+        approved    BOOLEAN NOT NULL DEFAULT false,
+        decision    TEXT,
+        output_enc  TEXT,
+        error_enc   TEXT,
+        attempts    INTEGER NOT NULL DEFAULT 0,
+        started_at  TIMESTAMPTZ,
+        finished_at TIMESTAMPTZ,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+        UNIQUE (mission_id, idx)
+      );
+      CREATE INDEX mission_steps_status_idx ON mission_steps(status);
+
+      -- Execution log. Messages can contain personal details, so they're encrypted.
+      CREATE TABLE agent_events (
+        id          BIGSERIAL PRIMARY KEY,
+        user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        mission_id  TEXT REFERENCES missions(id) ON DELETE CASCADE,
+        step_id     TEXT,
+        level       TEXT NOT NULL CHECK (level IN ('info', 'success', 'warn', 'error')),
+        kind        TEXT NOT NULL,
+        message_enc TEXT NOT NULL,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      CREATE INDEX agent_events_user_idx ON agent_events(user_id, id DESC);
+
+      ALTER TABLE tasks ADD COLUMN mission_id TEXT REFERENCES missions(id) ON DELETE SET NULL;
+      ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_source_check;
+      ALTER TABLE tasks ADD CONSTRAINT tasks_source_check CHECK (source IN ('user', 'suggestion', 'agent'));
+
+      -- Finance: only data Oliver enters or imports. Amounts in øre (1/100 NOK).
+      CREATE TABLE finance_transactions (
+        id              TEXT PRIMARY KEY,
+        user_id         TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        booked_on       DATE NOT NULL,
+        amount_minor    BIGINT NOT NULL,
+        currency        TEXT NOT NULL DEFAULT 'NOK',
+        description_enc TEXT NOT NULL,
+        category        TEXT NOT NULL,
+        source          TEXT NOT NULL CHECK (source IN ('manual', 'csv')),
+        import_hash     TEXT,
+        created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      CREATE INDEX finance_tx_user_idx ON finance_transactions(user_id, booked_on DESC);
+      CREATE UNIQUE INDEX finance_tx_hash_idx ON finance_transactions(user_id, import_hash) WHERE import_hash IS NOT NULL;
+
+      CREATE TABLE finance_budgets (
+        user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        category      TEXT NOT NULL,
+        monthly_minor BIGINT NOT NULL CHECK (monthly_minor > 0),
+        PRIMARY KEY (user_id, category)
+      );
+
+      -- Learned categorisation: "descriptions containing X are category Y".
+      CREATE TABLE finance_rules (
+        user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        pattern_enc TEXT NOT NULL,
+        pattern_key TEXT NOT NULL,
+        category    TEXT NOT NULL,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+        PRIMARY KEY (user_id, pattern_key)
+      );
+
+      -- Health & performance logs, entered by Oliver.
+      CREATE TABLE health_entries (
+        id         TEXT PRIMARY KEY,
+        user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        logged_on  DATE NOT NULL,
+        kind       TEXT NOT NULL CHECK (kind IN ('workout', 'sleep', 'weight', 'energy')),
+        value      NUMERIC(10, 2) NOT NULL,
+        note_enc   TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      CREATE INDEX health_user_idx ON health_entries(user_id, logged_on DESC);
+
+      -- Email drafts. Maverick never sends; Oliver hands them to his own mail app.
+      CREATE TABLE drafts (
+        id          TEXT PRIMARY KEY,
+        user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        mission_id  TEXT REFERENCES missions(id) ON DELETE SET NULL,
+        to_enc      TEXT NOT NULL,
+        subject_enc TEXT NOT NULL,
+        body_enc    TEXT NOT NULL,
+        status      TEXT NOT NULL CHECK (status IN ('draft', 'handed_off', 'discarded')),
+        written_by  TEXT NOT NULL CHECK (written_by IN ('model', 'template', 'user')),
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+      );
+      CREATE INDEX drafts_user_idx ON drafts(user_id, updated_at DESC);
+    `,
+  },
 ];
 
 export async function migrate(db: Db): Promise<string[]> {

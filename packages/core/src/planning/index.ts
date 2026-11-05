@@ -29,7 +29,8 @@ export interface Task {
   dueDate: string | null;
   remindAt: string | null;
   status: TaskStatus;
-  source: "user" | "suggestion";
+  source: "user" | "suggestion" | "agent";
+  missionId: string | null;
   createdAt: string;
   completedAt: string | null;
 }
@@ -157,7 +158,8 @@ export class PlanningStore {
   async createTask(
     userId: string,
     input: { title: unknown; notes?: unknown; priority?: unknown; dueDate?: unknown; remindAt?: unknown; goalId?: unknown },
-    source: "user" | "suggestion" = "user",
+    source: "user" | "suggestion" | "agent" = "user",
+    missionId: string | null = null,
   ): Promise<Task> {
     const title = text(input.title, "Task", 300, true)!;
     const priority = input.priority === undefined ? 2 : Number(input.priority);
@@ -166,11 +168,11 @@ export class PlanningStore {
     const remindAt = this.remind(input.remindAt);
     const id = randomUUID();
     await this.db.query(
-      `INSERT INTO tasks (id, user_id, goal_id, title_enc, notes_enc, priority, due_date, remind_at, source)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-      [id, userId, goalId, this.cipher.encrypt(title), this.enc(text(input.notes, "Notes", 2000)), priority, date(input.dueDate, "Due date"), remindAt, source],
+      `INSERT INTO tasks (id, user_id, goal_id, title_enc, notes_enc, priority, due_date, remind_at, source, mission_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [id, userId, goalId, this.cipher.encrypt(title), this.enc(text(input.notes, "Notes", 2000)), priority, date(input.dueDate, "Due date"), remindAt, source, missionId],
     );
-    await audit(this.db, { userId, actor: source === "user" ? "user" : "system", action: "task.created", target: id, details: { source } });
+    await audit(this.db, { userId, actor: source === "user" ? "user" : source === "agent" ? "assistant" : "system", action: "task.created", target: id, details: { source, ...(missionId ? { missionId } : {}) } });
     return (await this.getTask(userId, id))!;
   }
 
@@ -275,6 +277,7 @@ export class PlanningStore {
       remindAt: iso(r.remind_at),
       status: r.status,
       source: r.source,
+      missionId: r.mission_id ?? null,
       createdAt: iso(r.created_at)!,
       completedAt: iso(r.completed_at),
     };
@@ -302,7 +305,8 @@ type TaskRow = {
   due_date: Date | string | null;
   remind_at: Date | string | null;
   status: TaskStatus;
-  source: "user" | "suggestion";
+  source: "user" | "suggestion" | "agent";
+  mission_id?: string | null;
   created_at: Date | string;
   completed_at: Date | string | null;
 };

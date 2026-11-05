@@ -1,3 +1,5 @@
+import { FINANCE_CATEGORIES } from "./finance";
+import { HEALTH_KINDS } from "./health";
 import { randomUUID } from "node:crypto";
 import type { Db } from "./db/types";
 import type { FieldCipher } from "./util/crypto";
@@ -30,7 +32,7 @@ export async function importAll(db: Db, cipher: FieldCipher, userId: string, dat
   const date = (v: unknown) => (typeof v === "string" && !Number.isNaN(Date.parse(v)) ? new Date(v).toISOString() : new Date().toISOString());
   const day = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
   const enc = (v: string | null) => (v === null ? null : cipher.encrypt(v));
-  const result = { memories: 0, goals: 0, tasks: 0, conversations: 0, messages: 0 };
+  const result = { memories: 0, goals: 0, tasks: 0, conversations: 0, messages: 0, transactions: 0, healthEntries: 0, drafts: 0 };
 
   await db.transaction(async (tx) => {
     for (const m of arr("memories")) {
@@ -151,6 +153,40 @@ export async function importAll(db: Db, cipher: FieldCipher, userId: string, dat
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
         [randomUUID(), userId, str(u.provider, 40) ?? "import", u.model, Number(u.input_tokens) || 0, Number(u.output_tokens) || 0, Number(u.cost_usd) || 0, u.estimated === true, date(u.created_at)],
       );
+    }
+
+    // Finance, health and drafts (exports from 2026-11 onwards). Missions and logs stay behind: they describe the old install.
+    const fin = (d.finance ?? {}) as Record<string, unknown>;
+    for (const t of Array.isArray(fin.transactions) ? (fin.transactions as Record<string, unknown>[]) : []) {
+      const desc = str(t.description, 300);
+      const amount = Number(t.amountMinor);
+      if (!desc || !day(t.date) || !Number.isInteger(amount) || amount === 0 || !FINANCE_CATEGORIES.includes(t.category as never)) continue;
+      await tx.query("INSERT INTO finance_transactions (id, user_id, booked_on, amount_minor, description_enc, category, source) VALUES ($1,$2,$3,$4,$5,$6,$7)", [
+        randomUUID(), userId, day(t.date), amount, cipher.encrypt(desc), t.category, t.source === "csv" ? "csv" : "manual",
+      ]);
+      result.transactions++;
+    }
+    for (const b of Array.isArray(fin.budgets) ? (fin.budgets as Record<string, unknown>[]) : []) {
+      if (!FINANCE_CATEGORIES.includes(b.category as never) || !(Number(b.limitMinor) > 0)) continue;
+      await tx.query("INSERT INTO finance_budgets (user_id, category, monthly_minor) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING", [userId, b.category, Math.round(Number(b.limitMinor))]);
+    }
+    for (const h of arr("health")) {
+      const spec = HEALTH_KINDS[h.kind as keyof typeof HEALTH_KINDS];
+      const v = Number(h.value);
+      if (!spec || !day(h.date) || !Number.isFinite(v) || v < spec.min || v > spec.max) continue;
+      await tx.query("INSERT INTO health_entries (id, user_id, logged_on, kind, value, note_enc) VALUES ($1,$2,$3,$4,$5,$6)", [randomUUID(), userId, day(h.date), h.kind, v, enc(str(h.note, 300))]);
+      result.healthEntries++;
+    }
+    for (const dr of arr("drafts")) {
+      const subject = str(dr.subject, 300);
+      const body = str(dr.body, 20_000);
+      if (!subject || !body) continue;
+      await tx.query("INSERT INTO drafts (id, user_id, to_enc, subject_enc, body_enc, status, written_by) VALUES ($1,$2,$3,$4,$5,$6,$7)", [
+        randomUUID(), userId, cipher.encrypt(str(dr.to, 500) ?? ""), cipher.encrypt(subject), cipher.encrypt(body),
+        ["draft", "handed_off", "discarded"].includes(String(dr.status)) ? dr.status : "draft",
+        ["model", "template", "user"].includes(String(dr.writtenBy)) ? dr.writtenBy : "user",
+      ]);
+      result.drafts++;
     }
   });
 

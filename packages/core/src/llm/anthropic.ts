@@ -52,6 +52,10 @@ export class AnthropicProvider implements LLMProvider {
       strict: true,
       eager_input_streaming: true,
     })) as unknown as BetaToolUnion[];
+    if (req.webSearch) {
+      apiTools.push({ type: "web_search_20260209", name: "web_search", max_uses: req.webSearch.maxUses } as unknown as BetaToolUnion);
+    }
+    const seenSources = new Set<string>();
 
     const usage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
     let final: BetaMessage | null = null;
@@ -87,6 +91,20 @@ export class AnthropicProvider implements LLMProvider {
 
         if (final.stop_reason === "refusal") {
           throw new ProviderError("refusal", "The model declined to answer this request.");
+        }
+        for (const block of final.content as unknown as { type: string; citations?: { type: string; url?: string; title?: string }[] }[]) {
+          if (block.type !== "text" || !block.citations) continue;
+          for (const c of block.citations) {
+            if (c.url && !seenSources.has(c.url)) {
+              seenSources.add(c.url);
+              yield { type: "source", url: c.url, title: c.title || c.url };
+            }
+          }
+        }
+        // A long server-side search turn can pause; resume it by echoing the turn back.
+        if (final.stop_reason === "pause_turn" && round < maxRounds) {
+          messages.push({ role: "assistant", content: final.content });
+          continue;
         }
         const toolUses = final.content.filter((b): b is BetaToolUseBlock => b.type === "tool_use");
         // Never run tools from a truncated reply; never loop past the limit.

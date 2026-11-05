@@ -7,6 +7,7 @@ import type { ChatDeps } from "./chat/service";
 import type { Notifier } from "./notify";
 import { localParts, toMinutes } from "./util/time";
 import { log } from "./util/logger";
+import type { MissionEngine } from "./agent/engine";
 
 /** How long after the scheduled time a missed run still happens (e.g. the Mac was asleep at 05:30). */
 export const CATCH_UP_MINUTES: Record<BriefingKind, number> = { morning: 6 * 60, evening: 2 * 60, weekly: 6 * 60 };
@@ -43,6 +44,7 @@ export class Scheduler {
     private readonly deps: ChatDeps,
     private readonly briefings: BriefingService,
     private readonly notifier: Notifier | null,
+    private readonly agent: MissionEngine | null = null,
   ) {}
 
   start(intervalMs = 60_000) {
@@ -50,16 +52,19 @@ export class Scheduler {
     this.timer = setInterval(() => void this.tick(), intervalMs);
     this.timer.unref?.();
     setTimeout(() => void this.tick(), 5_000).unref?.();
+    // The mission executor runs on its own short loop so approved steps start within seconds.
+    this.agent?.start();
     log.info("scheduler_started", { intervalMs });
   }
 
   stop() {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+    this.agent?.stop();
   }
 
-  async tick(now = new Date()): Promise<{ briefings: string[]; reminders: number }> {
-    const out = { briefings: [] as string[], reminders: 0 };
+  async tick(now = new Date()): Promise<{ briefings: string[]; reminders: number; missions: number }> {
+    const out = { briefings: [] as string[], reminders: 0, missions: 0 };
     if (this.running) return out;
     this.running = true;
     try {
@@ -78,6 +83,13 @@ export class Scheduler {
           }
         }
         out.reminders += await this.sendReminders(user, settings, now);
+        if (this.agent) {
+          try {
+            out.missions += (await this.agent.runAutomations(user, now)).length;
+          } catch (err) {
+            log.error("automations_failed", { error: err as Error });
+          }
+        }
       }
       await this.deps.memory.purgeExpired();
       await this.deps.suggestions.expireOld();
