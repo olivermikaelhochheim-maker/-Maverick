@@ -11,6 +11,9 @@ import { Notifier, loadOrCreateVapid } from "./notify";
 import { BriefingService } from "./briefing";
 import { Scheduler } from "./scheduler";
 import { MissionEngine } from "./agent/engine";
+import { TaskLibrary } from "./library";
+import { zonedToUtc } from "./util/time";
+import { getSettings } from "./settings";
 
 export interface Maverick {
   db: Db;
@@ -25,6 +28,7 @@ export interface Maverick {
   briefings: BriefingService;
   scheduler: Scheduler;
   agent: MissionEngine;
+  library: TaskLibrary;
 }
 
 /**
@@ -56,6 +60,17 @@ export async function createMaverick(opts: { db?: Db; dataKey?: string; provider
   const notifier = new Notifier(db, cipher, await loadOrCreateVapid(db, cipher));
   const briefings = new BriefingService(db, cipher, providers, deps, notifier);
   const agent = new MissionEngine(db, cipher, providers, deps, notifier);
+  const library = new TaskLibrary(db, deps, agent.finance, agent.health);
+  // The morning briefing opens with what was prepared overnight and today's library picks.
+  briefings.setPreparation(async (user, localDate) => {
+    const settings = await getSettings(db, cipher, user.id);
+    const start = zonedToUtc(localDate, "00:00", settings.timezone).getTime();
+    const prep = (await agent.list(user.id, { limit: 20 })).find((m) => m.template === "overnight_prep" && Date.parse(m.createdAt) >= start);
+    const picks = (await deps.suggestions.list(user.id, "pending")).filter((s) => s.source === "library" && Date.parse(s.createdAt) >= start).map((s) => s.title);
+    const excerpt = prep?.report ? prep.report.slice(0, 1800) : null;
+    if (!prep && !picks.length) return null;
+    return { missionId: prep?.status === "completed" ? prep.id : null, excerpt, suggestions: picks };
+  });
   return {
     db,
     cipher,
@@ -67,7 +82,8 @@ export async function createMaverick(opts: { db?: Db; dataKey?: string; provider
     notifier,
     briefings,
     chat: new ChatService(db, cipher, providers, deps),
-    scheduler: new Scheduler(db, cipher, deps, briefings, notifier, agent),
+    scheduler: new Scheduler(db, cipher, deps, briefings, notifier, agent, library),
     agent,
+    library,
   };
 }

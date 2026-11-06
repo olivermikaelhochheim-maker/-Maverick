@@ -7,7 +7,7 @@ import { modelInfo, estimateTokens } from "../llm/catalog";
 import { getSettings, updateSettings, type AutonomyMode, type Settings } from "../settings";
 import { getSpend, planCall, recordUsage } from "../budget";
 import type { ChatDeps } from "../chat/service";
-import type { Notifier } from "../notify";
+import { queueNotice, type Notifier } from "../notify";
 import { FinanceStore } from "../finance";
 import { HealthStore } from "../health";
 import { DraftStore } from "../drafts";
@@ -656,9 +656,8 @@ export class MissionEngine {
       await this.db.query("UPDATE mission_steps SET status = 'awaiting_approval', decision = $1 WHERE id = $2", [decision, next.id]);
       await this.setMissionStatus(missionId, "awaiting_approval");
       await this.event(userId, missionId, next.id, "warn", "step.awaiting_approval", `Approval needed: ${next.preview}`);
-      if (this.notifier) {
-        await this.notifier.notify(userId, settings, { kind: "approval", title: "Approval needed", body: next.preview, url: `/missions/${missionId}` }, now).catch(() => {});
-      }
+      // Not urgent enough to interrupt: it goes out with the next batch (briefing, midday digest or check-in).
+      await queueNotice(this.db, this.cipher, userId, { kind: "approval", title: "Approval needed", body: next.preview, url: `/missions/${missionId}` });
       return true;
     }
 
@@ -803,8 +802,8 @@ export class MissionEngine {
     const msg = `Mission "${mission.title}" ${ok ? "completed" : "failed"}: ${done} done${recommended ? `, ${recommended} recommended` : ""}${failed ? `, ${failed} failed` : ""}.`;
     await this.event(userId, mission.id, null, ok ? "success" : "error", ok ? "mission.completed" : "mission.failed", msg);
     await audit(this.db, { userId, actor: "assistant", action: ok ? "mission.completed" : "mission.failed", target: mission.id, details: { done, failed, recommended } });
-    if (this.notifier && mission.source === "automation") {
-      await this.notifier.notify(userId, settings, { kind: "mission", title: ok ? "Mission complete" : "Mission failed", body: msg, url: `/missions/${mission.id}` }, now).catch(() => {});
+    if (mission.source === "automation" && mission.template !== "overnight_prep") {
+      await queueNotice(this.db, this.cipher, userId, { kind: "mission", title: ok ? "Mission complete" : "Mission failed", body: msg, url: `/missions/${mission.id}` });
     }
   }
 

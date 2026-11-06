@@ -1,8 +1,8 @@
 # Maverick: progress log
 
-## Status: Milestone 7 (command system redesign) built and tested.
+## Status: Milestone 8 (task library, batching, overnight preparation) built and tested.
 
-Last updated: 2026-11-05 · Code: https://github.com/olivermikaelhochheim-maker/-Maverick
+Last updated: 2026-11-06 · Code: https://github.com/olivermikaelhochheim-maker/-Maverick
 
 Milestone order (agreed with Oliver 2026-10-24): **Chief of Staff core** (old Phase 3 + read-only Google Calendar from Phase 4) came before voice, because Oliver's priorities are proactive thinking, suggestions and accountability.
 
@@ -78,6 +78,21 @@ Plan and audit: `docs/redesign/AUDIT-AND-ARCHITECTURE.md`. Decisions: ADR 0014.
 - **13 screens**: Command Center (customisable panels), Intelligence, Mission Control + mission view, Agent Operations, Daily Ops, Projects & Goals, Finance, Health, Communications, Research, Automations, Logs, Permissions
 - **Voice commands**: "Maverick, prepare tomorrow's briefing" launches the mission; anything else opens a conversation
 - Export/import now include finance, health and drafts
+
+### Milestone 8: Task library and a more independent Maverick (2026-11-06)
+Steps 1–4 of the independence plan (ADR 0015):
+- **Task library**: the 232 researched tasks with machine triggers (dates, anchors, unlocks, recurrence, data conditions); a daily run proposes the best 3 into the inbox, one per area, nothing big on shift days
+- **Learns from answers**: Accept / Not now (14 days) / Never; per-area acceptance steers future picks; Library screen to review, restore and suggest any task
+- **Batched notifications**: approvals and automation results wait for the briefing, a 15:00 digest or the check-in
+- **Overnight preparation**: read-only mission an hour before the briefing; the briefing opens with "Here's what I prepared overnight" and today's picks
+- Calendar without Google Cloud: private iCal link (milestone 7 follow-up); password reset command
+
+## Test results (2026-11-06, Linux cloud container)
+| Suite | Result |
+|---|---|
+| TypeScript typecheck (core + web) | ✅ pass |
+| Core unit + integration (Vitest) | ✅ 181 / 181 |
+| Browser end-to-end (Playwright; iPhone 15 + desktop) | ✅ 62 passed, 2 skipped by design |
 
 ## Test results (2026-11-05, Linux cloud container)
 | Suite | Result |

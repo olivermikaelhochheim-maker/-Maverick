@@ -74,6 +74,27 @@ export const TEMPLATES: TemplateDef[] = [
     }),
   },
   {
+    id: "overnight_prep",
+    label: "Overnight preparation",
+    description: "Runs by itself before the morning briefing: today's calendar, free time, overdue and due tasks, money and health, in one report. Reads only.",
+    params: [],
+    build: () => ({
+      template: "overnight_prep",
+      title: "Overnight preparation",
+      objective: "Have today's picture ready before Oliver wakes up.",
+      criteria: "Today's schedule, free time, due and overdue tasks, money and health summarised; nothing changed.",
+      steps: [
+        { tool: "calendar.read", title: "Today's calendar", input: { day: "today" } },
+        { tool: "schedule.analyze", title: "Free time today", input: { day: "today" } },
+        { tool: "tasks.review", title: "Due today", input: { scope: "due_today" } },
+        { tool: "tasks.review", title: "Overdue tasks", input: { scope: "overdue" } },
+        { tool: "finance.summary", title: "Money", input: {} },
+        { tool: "health.summary", title: "Health", input: {} },
+        { tool: "report.compose", title: "Overnight report", input: { kind: "situation" } },
+      ],
+    }),
+  },
+  {
     id: "clear_overdue",
     label: "Clear the overdue backlog",
     description: "Lists overdue tasks and moves them all to today (a bulk change that needs approval in most modes).",

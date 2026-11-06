@@ -10,6 +10,9 @@ A private AI chief of staff and command system for Oliver. It runs on your Mac o
 - **Health & performance** logs: workouts, sleep, weight, energy, with weekly trends.
 - **Communications**: Maverick drafts emails; you send them from your own mail app.
 - **Voice commands**: tap the mic in the top bar and say "Prepare me for tomorrow".
+- **Task library**: 232 researched tasks for your degree, pilot path, Zorza, money, physique, discipline and life. Each morning Maverick suggests the best 3 that are due (one per area). "Not now" brings one back in 14 days, "Never" stops it. Your exam and pilot-school dates time the related tasks (System → Task library).
+- **Overnight preparation**: an hour before your briefing Maverick prepares today's picture (calendar, free time, tasks, money, health); the briefing opens with it.
+- **Fewer pings**: approvals and finished missions wait for the next batch (morning briefing, 15:00 digest, evening check-in). Your own reminders still arrive on time.
 - **Conversation** with Claude, streamed live, with cost-aware model choice and hard spending limits.
 - **Memory Vault**: what Maverick knows about you, where each memory came from, how long it's kept. Edit, delete or export anything.
 - **Goals & tasks** with priorities, due dates and reminders.
@@ -201,6 +204,7 @@ Disconnect any time in Settings; it also revokes Maverick's access at Google.
 | 11 Automations | Recurring missions |
 | 12 Logs | Agent execution log and the audit log |
 | Permissions | Autonomy mode, per-tool permissions, limits, emergency stop |
+| Task library | All 232 tasks with status, daily suggestion settings, exam and pilot-school dates, midday digest time |
 | Memory Vault, Files, Usage, Security, Settings | As before |
 
 **Autonomy modes** (Permissions): **1 Advisory** reads and recommends, changes nothing. **2 Assisted** (default) reads on its own and asks before every change. **3 Autonomous** makes low-risk changes inside Maverick (tasks, reminders, drafts) on its own, up to 20 a day. **4 Autopilot** also runs medium-risk tools you've allowed. High-risk actions always ask, and the dangerous ones (sending, paying, deleting) don't exist at all.

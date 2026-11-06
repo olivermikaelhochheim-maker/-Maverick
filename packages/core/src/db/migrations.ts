@@ -458,6 +458,50 @@ export const MIGRATIONS: { id: string; sql: string }[] = [
       );
     `,
   },
+  {
+    id: "0008_task_library_and_digests",
+    sql: `
+      ALTER TABLE suggestions DROP CONSTRAINT IF EXISTS suggestions_source_check;
+      ALTER TABLE suggestions ADD CONSTRAINT suggestions_source_check CHECK (source IN ('conversation', 'briefing', 'library'));
+
+      -- How Oliver has answered each library task (drives what comes next).
+      CREATE TABLE library_state (
+        user_id          TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        task_id          TEXT NOT NULL,
+        shown_count      INTEGER NOT NULL DEFAULT 0,
+        accepted_count   INTEGER NOT NULL DEFAULT 0,
+        dismissed_count  INTEGER NOT NULL DEFAULT 0,
+        never            BOOLEAN NOT NULL DEFAULT false,
+        snoozed_until    DATE,
+        last_period      TEXT,
+        last_shown_at    TIMESTAMPTZ,
+        last_accepted_at TIMESTAMPTZ,
+        PRIMARY KEY (user_id, task_id)
+      );
+
+      -- Non-urgent notifications wait here and go out in batches (briefing, midday digest, check-in).
+      CREATE TABLE notification_queue (
+        id         BIGSERIAL PRIMARY KEY,
+        user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind       TEXT NOT NULL,
+        title_enc  TEXT NOT NULL,
+        body_enc   TEXT NOT NULL,
+        url        TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        sent_at    TIMESTAMPTZ
+      );
+      CREATE INDEX notification_queue_pending_idx ON notification_queue(user_id) WHERE sent_at IS NULL;
+
+      -- Once-a-day jobs (library picks, overnight preparation, midday digest), idempotent per local day.
+      CREATE TABLE daily_runs (
+        user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        job        TEXT NOT NULL,
+        local_date TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        PRIMARY KEY (user_id, job, local_date)
+      );
+    `,
+  },
 ];
 
 export async function migrate(db: Db): Promise<string[]> {

@@ -9,7 +9,7 @@ export interface SuggestionView {
   kind: "memory" | "task" | "goal" | "action";
   title: string;
   body: string | null;
-  source: "conversation" | "briefing";
+  source: "conversation" | "briefing" | "library";
   sourceRef: string | null;
   createdAt: string;
 }
@@ -35,10 +35,11 @@ export function SuggestionInbox({ initial, compact = false }: { initial: Suggest
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const act = async (id: string, action: "accept" | "dismiss", title?: string) => {
+  const act = async (id: string, action: "accept" | "dismiss", title?: string, reason?: "not_now" | "never") => {
     setError(null);
     try {
-      await api(`/api/suggestions/${id}`, { body: { action, title } });
+      await api(`/api/suggestions/${id}`, { body: { action, title, reason } });
+      if (reason === "never") toast("Got it. Maverick won't suggest that again (undo in Task library).");
       const item = items.find((x) => x.id === id);
       if (action === "accept" && item) {
         const where = item.kind === "memory" ? { label: "Memory Vault", href: "/memory" } : { label: "Goals & tasks", href: "/planning" };
@@ -62,6 +63,7 @@ export function SuggestionInbox({ initial, compact = false }: { initial: Suggest
             <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <span className={`badge ${s.kind === "action" ? "badge-accent" : ""}`}>{KIND_LABEL[s.kind]}</span>
+                {s.source === "library" && <span className="badge badge-blue" style={{ marginLeft: 6 }}>Library {s.sourceRef}</span>}
                 {editing === s.id ? (
                   <textarea
                     aria-label="Edit suggestion before accepting"
@@ -75,7 +77,7 @@ export function SuggestionInbox({ initial, compact = false }: { initial: Suggest
                 )}
                 {s.body && <p className="small muted" style={{ margin: 0 }}>{s.body}</p>}
                 <p className="hint" style={{ marginTop: "0.2rem" }}>
-                  From {s.source === "briefing" ? "a briefing" : "a conversation"}
+                  From {s.source === "briefing" ? "a briefing" : s.source === "library" ? <a href="/library">your task library</a> : "a conversation"}
                   {s.sourceRef && s.source === "conversation" && <> · <a href={`/chat/${s.sourceRef}`}>open</a></>}
                 </p>
               </div>
@@ -90,7 +92,14 @@ export function SuggestionInbox({ initial, compact = false }: { initial: Suggest
                 <>
                   <button className="btn btn-sm btn-primary" onClick={() => act(s.id, "accept")}>{ACCEPT_LABEL[s.kind]}</button>
                   <button className="btn btn-sm" onClick={() => { setEditing(s.id); setDraft(s.title); }}>Edit</button>
-                  <button className="btn btn-sm btn-ghost" onClick={() => act(s.id, "dismiss")}>Dismiss</button>
+                  {s.source === "library" ? (
+                    <>
+                      <button className="btn btn-sm btn-ghost" onClick={() => act(s.id, "dismiss", undefined, "not_now")} title="Comes back in 14 days">Not now</button>
+                      <button className="btn btn-sm btn-ghost" onClick={() => act(s.id, "dismiss", undefined, "never")} title="Never suggest this one again">Never</button>
+                    </>
+                  ) : (
+                    <button className="btn btn-sm btn-ghost" onClick={() => act(s.id, "dismiss")}>Dismiss</button>
+                  )}
                 </>
               )}
             </div>

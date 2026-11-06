@@ -31,6 +31,7 @@ const PAGES: [string, string, string][] = [
   ["Automations", "/automations", "↻"],
   ["Logs", "/logs", "≡"],
   ["Permissions & autonomy", "/permissions", "⚖"],
+  ["Task library", "/library", "≣"],
   ["Memory Vault", "/memory", "◉"],
   ["Files", "/files", "▢"],
   ["Usage & budget", "/usage", "$"],

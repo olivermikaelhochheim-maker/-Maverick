@@ -170,4 +170,25 @@ test.describe.serial("Command system", () => {
     await expect(page.getByRole("link", { name: "Open in Mail" })).toHaveAttribute("href", /^mailto:/);
     await setAgent(page, { mode: 2 });
   });
+
+  test("task library: daily picks land in the inbox; 'Never' is remembered and can be undone", async ({ page }) => {
+    await ensureAccount(page);
+    await page.goto("/library");
+    await expect(page.getByRole("heading", { name: "All 232 tasks" })).toBeVisible();
+    await page.getByRole("button", { name: "Suggest today's tasks now" }).click();
+    await expect(page.locator(".toast").last()).toContainText(/new suggestion|Nothing new/);
+    await page.goto("/planning");
+    const item = page.locator(".inbox-item", { has: page.locator(".badge", { hasText: /^Library / }) }).first();
+    await expect(item).toBeVisible();
+    const id = (await item.locator(".badge", { hasText: /^Library / }).innerText()).replace("Library ", "").trim();
+    await item.getByRole("button", { name: "Never" }).click();
+    await expect(page.locator(".toast").last()).toContainText("won't suggest that again");
+    await page.goto("/library");
+    await page.getByLabel("Search tasks").fill(id);
+    const row = page.locator("tr", { has: page.locator("td.mono", { hasText: new RegExp(`^${id}$`) }) });
+    await expect(row.locator(".st")).toHaveText("Never");
+    await row.getByRole("button", { name: "Restore" }).click();
+    await expect(page.locator(".toast").last()).toContainText("Restored");
+    await expect(row.locator(".st")).not.toHaveText("Never");
+  });
 });

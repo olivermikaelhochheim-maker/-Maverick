@@ -77,7 +77,7 @@ export function validateSubscription(raw: unknown): PushSubscriptionJson {
   return { endpoint: url.toString(), keys: { p256dh: keys!.p256dh as string, auth: keys!.auth as string } };
 }
 
-export type NotifyKind = "briefing" | "checkin" | "review" | "reminder" | "test" | "approval" | "mission";
+export type NotifyKind = "briefing" | "checkin" | "review" | "reminder" | "test" | "approval" | "mission" | "digest";
 
 export interface NotifyResult {
   status: "sent" | "failed" | "suppressed";
@@ -201,4 +201,42 @@ export class Notifier {
       at.toISOString(),
     ]);
   }
+}
+
+// ---------- Batched notices ----------
+// Research (randomised field study, Fitz et al. 2019): three batches a day beat both
+// constant and hourly notifications. So non-urgent updates wait here and go out with
+// the morning briefing, the midday digest or the evening check-in.
+
+export interface Notice {
+  kind: NotifyKind;
+  title: string;
+  body: string;
+  url: string;
+}
+
+export async function queueNotice(db: Db, cipher: FieldCipher, userId: string, n: Notice): Promise<void> {
+  await db.query("INSERT INTO notification_queue (user_id, kind, title_enc, body_enc, url) VALUES ($1,$2,$3,$4,$5)", [
+    userId,
+    n.kind,
+    cipher.encrypt(n.title.slice(0, 200)),
+    cipher.encrypt(n.body.slice(0, 500)),
+    n.url.slice(0, 300),
+  ]);
+}
+
+/** Take every waiting notice (marking them sent) so a batch can include them. */
+export async function drainNotices(db: Db, cipher: FieldCipher, userId: string): Promise<Notice[]> {
+  const { rows } = await db.query<{ kind: NotifyKind; title_enc: string; body_enc: string; url: string }>(
+    "UPDATE notification_queue SET sent_at = now() WHERE user_id = $1 AND sent_at IS NULL RETURNING kind, title_enc, body_enc, url, id",
+    [userId],
+  );
+  return rows.map((r) => ({ kind: r.kind, title: cipher.decrypt(r.title_enc), body: cipher.decrypt(r.body_enc), url: r.url }));
+}
+
+/** One line for a push: "1 approval waiting · Mission complete: Situation report". */
+export function summariseNotices(items: Notice[]): string {
+  const approvals = items.filter((i) => i.kind === "approval").length;
+  const rest = items.filter((i) => i.kind !== "approval").map((i) => (i.kind === "mission" ? i.body.split(":")[0] : i.title));
+  return [approvals ? `${approvals} approval${approvals === 1 ? "" : "s"} waiting` : "", ...rest].filter(Boolean).join(" · ");
 }

@@ -45,11 +45,23 @@ export interface Settings {
     weeklyReview: boolean;
     /** Let Maverick propose memories, tasks, goals and actions from conversations (they wait in the inbox). */
     suggestFromChat: boolean;
+    /** Run a read-only "overnight preparation" mission an hour before the morning briefing. */
+    overnightPrep: boolean;
   };
   notifications: {
     /** Consent for push notifications to subscribed devices. */
     enabled: boolean;
     maxPerDay: number;
+    /** Local time of the midday digest ("" = off). Non-urgent updates wait for it, the briefing or the check-in. */
+    middayDigest: string;
+  };
+  /** The researched task library: daily suggestions from 232 tasks. */
+  library: {
+    enabled: boolean;
+    /** New library suggestions per day (at most one per area). */
+    perDay: number;
+    /** Dates the library plans around (YYYY-MM-DD, or "" if unknown). */
+    anchors: { exam: string; exam2: string; pilotStart: string };
   };
   ui: { reduceMotion: boolean };
   /** The agent engine: how much Maverick may do on his own. */
@@ -106,8 +118,9 @@ export const DEFAULT_SETTINGS: Settings = {
     weeklyReview: { day: 0, time: "18:00" },
     quietHours: { start: "22:00", end: "05:00" },
   },
-  proactive: { morningBriefing: true, eveningCheckIn: true, weeklyReview: true, suggestFromChat: true },
-  notifications: { enabled: false, maxPerDay: 6 },
+  proactive: { morningBriefing: true, eveningCheckIn: true, weeklyReview: true, suggestFromChat: true, overnightPrep: true },
+  notifications: { enabled: false, maxPerDay: 6, middayDigest: "15:00" },
+  library: { enabled: true, perDay: 3, anchors: { exam: "2026-11-20", exam2: "", pilotStart: "2027-08-24" } },
   ui: { reduceMotion: false },
   agent: { mode: 2, halted: false, dailyAutoActions: 20, maxSteps: 12, missionCostUsd: 0.5, toolOverrides: {} },
 };
@@ -165,6 +178,12 @@ export function validateSettings(s: Settings): Settings {
   for (const [k, v] of Object.entries(s.proactive)) if (typeof v !== "boolean") fail(`Invalid setting: ${k}.`);
   if (typeof s.notifications.enabled !== "boolean") fail("Invalid notification setting.");
   num(s.notifications.maxPerDay, 0, 50, "Notifications per day");
+  if (s.notifications.middayDigest !== "") hhmm(s.notifications.middayDigest, "Midday digest time");
+  if (typeof s.library.enabled !== "boolean") fail("Invalid library setting.");
+  num(s.library.perDay, 0, 10, "Library suggestions per day");
+  for (const [k, v] of Object.entries(s.library.anchors)) {
+    if (v !== "" && (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v) || Number.isNaN(Date.parse(v)))) fail(`The ${k} date must look like 2027-08-24, or be empty.`);
+  }
   if (typeof s.ui.reduceMotion !== "boolean") fail("Invalid motion setting.");
   if (![1, 2, 3, 4].includes(s.agent.mode)) fail("Autonomy mode must be 1-4.");
   if (typeof s.agent.halted !== "boolean") fail("Invalid emergency-stop setting.");

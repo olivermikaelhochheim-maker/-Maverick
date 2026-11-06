@@ -5,6 +5,7 @@ import { audit } from "./audit";
 import { MEMORY_CATEGORIES, MemoryStore, type MemoryCategory } from "./memory";
 import { HORIZONS, PlanningStore, type Horizon } from "./planning";
 import { UserFacingError } from "./util/errors";
+import { recordLibraryDecision } from "./library/state";
 
 export type SuggestionKind = "memory" | "task" | "goal" | "action";
 export type SuggestionStatus = "pending" | "accepted" | "dismissed" | "expired";
@@ -22,10 +23,12 @@ export interface Suggestion {
   body: string | null;
   payload: SuggestionPayload;
   status: SuggestionStatus;
-  source: "conversation" | "briefing";
+  source: SuggestionSource;
   sourceRef: string | null;
   createdAt: string;
 }
+
+export type SuggestionSource = "conversation" | "briefing" | "library";
 
 /** Most pending suggestions kept at once; the oldest expire first. */
 export const MAX_PENDING = 30;
@@ -39,7 +42,7 @@ type Row = {
   body_enc: string | null;
   payload_enc: string;
   status: SuggestionStatus;
-  source: "conversation" | "briefing";
+  source: SuggestionSource;
   source_ref: string | null;
   created_at: Date | string;
 };
@@ -117,7 +120,7 @@ export class SuggestionStore {
   async propose(
     userId: string,
     payload: SuggestionPayload,
-    opts: { reason?: string | null; source: "conversation" | "briefing"; sourceRef?: string },
+    opts: { reason?: string | null; source: SuggestionSource; sourceRef?: string },
   ): Promise<Suggestion | null> {
     const title = titleOf(payload);
     const pending = await this.list(userId, "pending");
@@ -200,17 +203,22 @@ export class SuggestionStore {
       createdId = (await this.planning.createTask(userId, { title: edited || p.title, notes: p.why }, "suggestion")).id;
     }
     await this.db.query("UPDATE suggestions SET status = 'accepted', decided_at = now() WHERE id = $1", [id]);
+    if (s.source === "library" && s.sourceRef) await recordLibraryDecision(this.db, userId, s.sourceRef, "accepted", new Date().toISOString().slice(0, 10));
     await audit(this.db, { userId, actor: "user", action: "suggestion.accepted", target: id, details: { kind: s.kind, createdId, edited: Boolean(edited) } });
     return { createdId, kind: s.kind };
   }
 
-  async dismiss(userId: string, id: string): Promise<void> {
-    const { rows } = await this.db.query(
-      "UPDATE suggestions SET status = 'dismissed', decided_at = now() WHERE id = $1 AND user_id = $2 AND status = 'pending' RETURNING id",
+  /** Dismiss. For library suggestions, "never" stops that task for good; otherwise it rests for 14 days. */
+  async dismiss(userId: string, id: string, reason: "not_now" | "never" = "not_now"): Promise<void> {
+    const { rows } = await this.db.query<{ source: SuggestionSource; source_ref: string | null }>(
+      "UPDATE suggestions SET status = 'dismissed', decided_at = now() WHERE id = $1 AND user_id = $2 AND status = 'pending' RETURNING source, source_ref",
       [id, userId],
     );
     if (!rows.length) throw new UserFacingError("Suggestion not found or already handled.", "not_found", 404);
-    await audit(this.db, { userId, actor: "user", action: "suggestion.dismissed", target: id });
+    if (rows[0]!.source === "library" && rows[0]!.source_ref) {
+      await recordLibraryDecision(this.db, userId, rows[0]!.source_ref, reason === "never" ? "never" : "not_now", new Date().toISOString().slice(0, 10));
+    }
+    await audit(this.db, { userId, actor: "user", action: "suggestion.dismissed", target: id, details: { reason } });
   }
 
   async expireOld(): Promise<number> {

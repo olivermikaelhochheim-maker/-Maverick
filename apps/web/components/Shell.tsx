@@ -26,6 +26,7 @@ export const NAV = [
 ];
 
 export const SYSTEM_NAV = [
+  { href: "/library", label: "Task library", icon: Icon.list },
   { href: "/permissions", label: "Permissions", icon: Icon.sliders },
   { href: "/memory", label: "Memory Vault", icon: Icon.brain },
   { href: "/files", label: "Files", icon: Icon.files },

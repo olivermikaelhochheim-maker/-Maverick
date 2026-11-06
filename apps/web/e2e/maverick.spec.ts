@@ -219,7 +219,7 @@ test.describe.serial("Maverick", () => {
 
   test("every page fits the screen without sideways scrolling", async ({ page }) => {
     await ensureAccount(page);
-    for (const p of ["/", "/chat", "/missions", "/agents", "/ops", "/planning", "/finance", "/health", "/comms", "/research", "/automations", "/logs", "/permissions", "/more", "/memory", "/files", "/usage", "/security", "/settings"]) {
+    for (const p of ["/", "/chat", "/missions", "/agents", "/ops", "/planning", "/finance", "/health", "/comms", "/research", "/automations", "/logs", "/permissions", "/library", "/more", "/memory", "/files", "/usage", "/security", "/settings"]) {
       const res = await page.goto(p);
       expect(res?.status(), `${p} should load without a server error`).toBeLessThan(400);
       await expect(page.getByText(/Application error|Internal Server Error/)).toHaveCount(0);
